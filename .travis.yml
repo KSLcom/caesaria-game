@@ -27,13 +27,15 @@ install:
 - cd $TRAVIS_BUILD_DIR
 # Create unix makefiles
 - cmake -DCMAKE_BUILD_TYPE=Release
-before_script:
 script:
 # Build CaesarIA
-- make
+- make -j4
+- cd $TRAVIS_BUILD_DIR/
+- ls
+- cd $TRAVIS_BUILD_DIR/../caesaria-test
+- ls
 after_success:
 - export REVISION_NUMBER=`git rev-list HEAD --count`
-- ls
 - cd $TRAVIS_BUILD_DIR/
 - ls
 - cd $TRAVIS_BUILD_DIR/../caesaria-test
