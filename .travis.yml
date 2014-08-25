@@ -26,7 +26,6 @@ script:
 # Build CaesarIA
 - make -j4
 after_success:
-after_success:
 - cd $TRAVIS_BUILD_DIR/
 - ls
 - cd $TRAVIS_BUILD_DIR/../caesaria-test
