@@ -23,16 +23,16 @@ before_script:
 
 script:
 # Build CaesarIA
-- make
+#- make
 after_success:
 - cd $TRAVIS_BUILD_DIR/../caesaria-test
 - ls
 # Prepare ZIP archive
-- ZIPNAME=caesaria-0.4-linux64-$TRAVIS_BRANCH-`date +"%Y%m%d"`.zip
-- echo Compress to $ZIPNAME
-- zip -r $ZIPNAME *
-- chmod 666 $ZIPNAME
+#- ZIPNAME=caesaria-0.4-linux64-$TRAVIS_BRANCH-`date +"%Y%m%d"`.zip
+#- echo Compress to $ZIPNAME
+#- zip -r $ZIPNAME *
+#- chmod 666 $ZIPNAME
 # Upload to server
-- sshpass -p "$SCP_PASS" scp -v $ZIPNAME dalerank@frs.sourceforge.net:/home/frs/project/opencaesar3/bin/
+#- sshpass -p "$SCP_PASS" scp -v $ZIPNAME dalerank@frs.sourceforge.net:/home/frs/project/opencaesar3/bin/
 env:
 
