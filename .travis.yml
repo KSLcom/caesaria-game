@@ -26,7 +26,6 @@ before_script:
 - ls /usr/lib
 
 script:
-- cd $TRAVIS_BUILD_DIR
 # Build CaesarIA
 - make -j4
 after_success:
