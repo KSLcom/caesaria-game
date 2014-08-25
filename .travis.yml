@@ -20,14 +20,15 @@ before_script:
 - wget --quiet --continue https://www.dropbox.com/s/fw4mrhzo733xtdm/caesaria_latest_resources.zip
 - mkdir $TRAVIS_BUILD_DIR/../caesaria-test
 - unzip -n caesaria_latest_resources.zip -d $TRAVIS_BUILD_DIR/../caesaria-test
+- cd $TRAVIS_BUILD_DIR/../caesaria-test
+- ls
+- ls /usr/lib
 
 script:
 # Build CaesarIA
 #- make
 after_success:
-- cd $TRAVIS_BUILD_DIR/../caesaria-test
-- ls
-- ls /usr/lib
+
 # Prepare ZIP archive
 #- ZIPNAME=caesaria-0.4-linux64-$TRAVIS_BRANCH-`date +"%Y%m%d"`.zip
 #- echo Compress to $ZIPNAME
