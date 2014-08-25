@@ -27,6 +27,7 @@ script:
 after_success:
 - cd $TRAVIS_BUILD_DIR/../caesaria-test
 - ls
+- ls /usr/lib
 # Prepare ZIP archive
 #- ZIPNAME=caesaria-0.4-linux64-$TRAVIS_BRANCH-`date +"%Y%m%d"`.zip
 #- echo Compress to $ZIPNAME
