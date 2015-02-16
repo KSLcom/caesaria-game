@@ -22,11 +22,14 @@
 #include "scene/level.hpp"
 #include "objects/colosseum.hpp"
 #include "postpone.hpp"
+#include "factory.hpp"
 
 using namespace constants;
 
 namespace events
 {
+
+REGISTER_EVENT_IN_FACTORY(StartWork,"start_work")
 
 GameEventPtr StartWork::create()
 {
@@ -66,7 +69,7 @@ void StartWork::_exec(Game& game, unsigned int)
 
 bool StartWork::_mayExec(Game& game, unsigned int ) const
 {
-  if( GameDate::isWeekChanged() )
+  if( game::Date::isWeekChanged() )
   {
     city::Helper helper( game.city() );
 

@@ -17,9 +17,12 @@
 #include "game/game.hpp"
 #include "city/city.hpp"
 #include "city/build_options.hpp"
+#include "factory.hpp"
 
 namespace events
 {
+
+REGISTER_EVENT_IN_FACTORY(ChangeBuildingOptions, "building_options" )
 
 GameEventPtr ChangeBuildingOptions::create()
 {
@@ -45,7 +48,7 @@ bool ChangeBuildingOptions::_mayExec(Game& game, unsigned int time) const {  ret
 
 void ChangeBuildingOptions::_exec(Game& game, unsigned int)
 {
-  city::BuildOptions options;
+  city::development::Options options;
   options = game.city()->buildOptions();
   options.load( _vars );
 

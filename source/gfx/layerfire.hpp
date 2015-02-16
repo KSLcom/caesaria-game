@@ -18,13 +18,16 @@
 #ifndef __CAESARIA_LAYERFIRE_H_INCLUDED__
 #define __CAESARIA_LAYERFIRE_H_INCLUDED__
 
-#include "layer.hpp"
+#include "layerinfo.hpp"
 #include "city_renderer.hpp"
 
 namespace gfx
 {
 
-class LayerFire : public Layer
+namespace layer
+{
+
+class Fire : public Info
 {
 public:
   virtual int type() const;
@@ -34,8 +37,10 @@ public:
   static LayerPtr create( Camera& camera, PlayerCityPtr city );
 
 private:
-  LayerFire( Camera& camera, PlayerCityPtr city );
+  Fire( Camera& camera, PlayerCityPtr city );
 };
+
+}
 
 }//end namespace gfx
 

@@ -16,9 +16,10 @@
 // Copyright 2012-2013 Dalerank, dalerankn8@gmail.com
 
 #include "wallguard.hpp"
-#include "city/city.hpp"
+#include "city/helper.hpp"
 #include "name_generator.hpp"
 #include "corpse.hpp"
+#include "core/variant_map.hpp"
 #include "game/resourcegroup.hpp"
 #include "objects/military.hpp"
 #include "pathway/pathway_helper.hpp"
@@ -133,7 +134,7 @@ void WallGuard::timeStep(const unsigned long time)
   break;
 
   case patrol:
-    if( GameDate::isDayChanged() )
+    if( game::Date::isDayChanged() )
     {
       bool haveEnemies = _tryAttack();
       if( !haveEnemies )
@@ -185,6 +186,46 @@ void WallGuard::load(const VariantMap& stream)
     die();
   }
 }
+
+std::string WallGuard::thoughts(Thought th) const
+{
+  switch( th )
+  {
+  case thCurrent:
+  {
+    city::Helper helper( _city() );
+
+    TilePos offset( 10, 10 );
+    EnemySoldierList enemies = helper.find<EnemySoldier>( walker::any, pos() - offset, pos() + offset );
+    if( enemies.empty() )
+    {
+      return Soldier::thoughts(th);
+    }
+    else
+    {
+      return "##city_have_defence##";
+    }
+  }
+  break;
+
+  default: break;
+  }
+
+  return "";
+}
+
+TilePos WallGuard::places(Walker::Place type) const
+{
+  switch( type )
+  {
+  case plOrigin: return _d->base.isValid() ? _d->base->pos() : TilePos( -1, -1 );
+  case plDestination: return _d->patrolPosition;
+  default: break;
+  }
+
+  return RomeSoldier::places( type );
+}
+
 
 void WallGuard::setBase(TowerPtr tower)
 {
@@ -341,7 +382,7 @@ void WallGuard::_brokePathway(TilePos p)
     {
       _setSubAction( patrol );
       setPathway( Pathway() );
-      wait( GameDate::days2ticks( 7 ) );
+      wait( game::Date::days2ticks( 7 ) );
     }
   }
 }
@@ -355,7 +396,7 @@ void WallGuard::_fire( TilePos target )
 {
   SpearPtr spear = Spear::create( _city() );
   spear->toThrow( pos(), target );
-  wait( GameDate::days2ticks( 1 ) / 2 );
+  wait( game::Date::days2ticks( 1 ) / 2 );
 }
 
 void WallGuard::_centerTile()
@@ -391,7 +432,7 @@ void WallGuard::send2city( TowerPtr tower, Pathway pathway )
 
   if( !isDeleted() )
   {
-    _city()->addWalker( this );
+    attach();
   }
 }
 

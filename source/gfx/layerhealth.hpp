@@ -16,12 +16,15 @@
 #ifndef __CAESARIA_LAYERHEALTH_H_INCLUDED__
 #define __CAESARIA_LAYERHEALTH_H_INCLUDED__
 
-#include "layer.hpp"
+#include "layerinfo.hpp"
 
 namespace gfx
 {
 
-class LayerHealth : public Layer
+namespace layer
+{
+
+class Health : public Info
 {
 public:
   virtual int type() const;
@@ -31,12 +34,14 @@ public:
   virtual void handleEvent(NEvent& event);
 
 private:
-  LayerHealth(Camera& camera, PlayerCityPtr city, int type );
+  Health(Camera& camera, PlayerCityPtr city, int type );
   int _getLevelValue(HousePtr house);
 
   std::set<int> _flags;
   int _type;
 };
+
+}
 
 }//end namespace gfx
 

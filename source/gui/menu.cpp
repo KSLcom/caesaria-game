@@ -34,7 +34,7 @@
 #include "gfx/engine.hpp"
 #include "overlays_menu.hpp"
 #include "core/foreach.hpp"
-#include "core/stringhelper.hpp"
+#include "core/utils.hpp"
 #include "core/logger.hpp"
 #include "objects/constants.hpp"
 #include "city/city.hpp"
@@ -42,6 +42,7 @@
 
 using namespace constants;
 using namespace gfx;
+using namespace city;
 
 namespace gui
 {
@@ -88,7 +89,7 @@ public:
   void playSound();
   void updateBuildingOptions();
 
-oc3_signals public:
+signals public:
   Signal1<int> onCreateConstructionSignal;
   Signal0<> onRemoveToolSignal;
   Signal0<> onHideSignal;
@@ -126,31 +127,31 @@ Menu::Menu( Widget* parent, int id, const Rect& rectangle )
 
   _d->minimizeButton->setGeometry( Rect( Point( 6, 4 ), Size( 31, 20 ) ) );
 
-  _d->houseButton = _addButton( ResourceMenu::houseBtnPicId, true, 0, building::house,
+  _d->houseButton = _addButton( ResourceMenu::houseBtnPicId, true, 0, objects::house,
                                 !haveSubMenu, ResourceMenu::houseMidPicId, _("##build_housing##") );
 
   _d->clearButton = _addButton( 131, true, 1, REMOVE_TOOL_ID,
                                 !haveSubMenu, ResourceMenu::clearMidPicId, _("##clear_land##") );
 
-  _d->roadButton = _addButton( 135, true, 2, construction::road, !haveSubMenu, ResourceMenu::roadMidPicId, _("##build_road_tlp##") );
-  _d->waterButton = _addButton( 127, true, 3, BM_WATER, haveSubMenu, ResourceMenu::waterMidPicId, _("##water_build_tlp##") );
-  _d->healthButton = _addButton( 163, true, 4, BM_HEALTH, haveSubMenu, ResourceMenu::healthMidPicId, _("##healthBtnTooltip##") );
-  _d->templeButton = _addButton( 151, true, 5, BM_RELIGION, haveSubMenu, ResourceMenu::religionMidPicId, _("##templeBtnTooltip##") );
-  _d->educationButton = _addButton( 147, true, 6, BM_EDUCATION, haveSubMenu, ResourceMenu::educationMidPicId, _("##education_objects##") );
+  _d->roadButton = _addButton( 135, true, 2, objects::road, !haveSubMenu, ResourceMenu::roadMidPicId, _("##build_road_tlp##") );
+  _d->waterButton = _addButton( 127, true, 3, development::water, haveSubMenu, ResourceMenu::waterMidPicId, _("##water_build_tlp##") );
+  _d->healthButton = _addButton( 163, true, 4, development::health, haveSubMenu, ResourceMenu::healthMidPicId, _("##healthBtnTooltip##") );
+  _d->templeButton = _addButton( 151, true, 5, development::religion, haveSubMenu, ResourceMenu::religionMidPicId, _("##templeBtnTooltip##") );
+  _d->educationButton = _addButton( 147, true, 6, development::education, haveSubMenu, ResourceMenu::educationMidPicId, _("##education_objects##") );
 
-  _d->entertainmentButton = _addButton( 143, true, 7, BM_ENTERTAINMENT, haveSubMenu,
+  _d->entertainmentButton = _addButton( 143, true, 7, development::entertainment, haveSubMenu,
                                         ResourceMenu::entertainmentMidPicId, _("##entertainment##") );
 
-  _d->administrationButton = _addButton( 139, true, 8, BM_ADMINISTRATION, haveSubMenu,
+  _d->administrationButton = _addButton( 139, true, 8, development::administration, haveSubMenu,
                                          ResourceMenu::administrationMidPicId, _("##administration_building##") );
 
-  _d->engineerButton = _addButton( 167, true, 9, BM_ENGINEERING, haveSubMenu,
+  _d->engineerButton = _addButton( 167, true, 9, development::engineering, haveSubMenu,
                                    ResourceMenu::engineerMidPicId, _("##engineering_structures##") );
 
-  _d->securityButton = _addButton( 159, true, 10, BM_SECURITY, haveSubMenu,
+  _d->securityButton = _addButton( 159, true, 10, development::security, haveSubMenu,
                                    ResourceMenu::securityMidPicId, _("##securityBtnTooltip##") );
 
-  _d->commerceButton = _addButton( 155, true, 11, BM_COMMERCE, haveSubMenu,
+  _d->commerceButton = _addButton( 155, true, 11, development::commerce, haveSubMenu,
                                    ResourceMenu::comerceMidPicId, _("##comerceBtnTooltip##") );
 
   CONNECT( _d->minimizeButton, onClicked(), this, Menu::minimize );
@@ -196,17 +197,17 @@ bool Menu::onEvent(const NEvent& event)
     int id = event.gui.caller->ID();
     switch( id )
     {
-    case building::house:
-    case construction::road:
+    case objects::house:
+    case objects::road:
       _d->lastPressed = event.gui.caller;
       _createBuildMenu( -1, this );
-      oc3_emit _d->onCreateConstructionSignal( id );
+      emit _d->onCreateConstructionSignal( id );
     break;
 
     case REMOVE_TOOL_ID:
       _d->lastPressed = event.gui.caller;
       _createBuildMenu( -1, this );
-      oc3_emit _d->onRemoveToolSignal();
+      emit _d->onRemoveToolSignal();
     break;
 
     default:
@@ -224,7 +225,7 @@ bool Menu::onEvent(const NEvent& event)
           }
           else
           {
-            oc3_emit _d->onCreateConstructionSignal( id );
+            emit _d->onCreateConstructionSignal( id );
             _createBuildMenu( -1, this );
             setFocus();
           }
@@ -305,7 +306,7 @@ void Menu::minimize()
   _createBuildMenu( -1, this );
   Point stopPos = lefttop() + Point( width(), 0 );
   PositionAnimator* anim = new PositionAnimator( this, WidgetAnimator::removeSelf, stopPos, 300 );
-  CONNECT( anim, onFinish(), &_d->onHideSignal, Signal0<>::emit );
+  CONNECT( anim, onFinish(), &_d->onHideSignal, Signal0<>::_emit );
 
   events::GameEventPtr e = events::PlaySound::create( "panel", 3, 100 );
   e->dispatch();
@@ -341,7 +342,7 @@ void Menu::_createBuildMenu( int type, Widget* parent )
    List< BuildMenu* > menus = findChildren<BuildMenu*>();
    foreach( item, menus ) { (*item)->deleteLater(); }
 
-   BuildMenu* buildMenu = BuildMenu::create( (BuildMenuType)type, this );
+   BuildMenu* buildMenu = BuildMenu::create( (development::Branch)type, this );
 
    if( buildMenu != NULL )
    {
@@ -371,16 +372,16 @@ void Menu::Impl::playSound()
 
 void Menu::Impl::updateBuildingOptions()
 {
-  const city::BuildOptions& options = city->buildOptions();
-  waterButton->setEnabled( options.isGroupAvailable( BM_WATER ) );
-  administrationButton->setEnabled( options.isGroupAvailable( BM_ADMINISTRATION ) );
-  entertainmentButton->setEnabled( options.isGroupAvailable( BM_ENTERTAINMENT ) );
-  educationButton->setEnabled( options.isGroupAvailable( BM_EDUCATION ));
-  templeButton->setEnabled( options.isGroupAvailable( BM_RELIGION ));
-  commerceButton->setEnabled( options.isGroupAvailable( BM_COMMERCE ));
-  securityButton->setEnabled( options.isGroupAvailable( BM_SECURITY ));
-  healthButton->setEnabled( options.isGroupAvailable( BM_HEALTH ) );
-  engineerButton->setEnabled( options.isGroupAvailable( BM_ENGINEERING ));
+  const development::Options& options = city->buildOptions();
+  waterButton->setEnabled( options.isGroupAvailable( development::water ));
+  administrationButton->setEnabled( options.isGroupAvailable( development::administration ));
+  entertainmentButton->setEnabled( options.isGroupAvailable( development::entertainment ));
+  educationButton->setEnabled( options.isGroupAvailable( development::education ));
+  templeButton->setEnabled( options.isGroupAvailable( development::religion ));
+  commerceButton->setEnabled( options.isGroupAvailable( development::commerce ));
+  securityButton->setEnabled( options.isGroupAvailable( development::security ));
+  healthButton->setEnabled( options.isGroupAvailable( development::health ));
+  engineerButton->setEnabled( options.isGroupAvailable( development::engineering ));
 }
 
 ExtentMenu* ExtentMenu::create(Widget* parent, int id, PlayerCityPtr city )
@@ -444,15 +445,17 @@ ExtentMenu::ExtentMenu(Widget* p, int id, const Rect& rectangle )
   
   _d->missionButton = _addButton( 85, false, 0, -1, false, -1, _("##missionBtnTooltip##") );
   _d->missionButton->setGeometry( Rect( Point( 7, 184 ), Size( 33, 22 ) ) );
-  _d->northButton = _addButton( 88, false, 0, -1, false, -1, _("##northBtnTooltip##") );
+  _d->northButton = _addButton( 88, false, 0, -1, false, -1, _("##reorient_map_to_north##") );
   _d->northButton->setGeometry( Rect( Point( 46, 184 ), Size( 33, 22 ) ) );
-  _d->rotateLeftButton = _addButton( 91, false, 0, -1, false, -1, _("##rotateLeftBtnTooltip##") );
+  _d->rotateLeftButton = _addButton( 91, false, 0, -1, false, -1, _("##rotate_map_counter-clockwise##") );
   _d->rotateLeftButton->setGeometry( Rect( Point( 84, 184 ), Size( 33, 22 ) ) );
-  _d->rotateRightButton = _addButton( 94, false, 0, -1, false, -1, _("##rotateRightBtnTooltip##") );
+  _d->rotateRightButton = _addButton( 94, false, 0, -1, false, -1, _("##rotate_map_clockwise##") );
   _d->rotateRightButton->setGeometry( Rect( Point( 123, 184 ), Size( 33, 22 ) ) );
 
   _d->cancelButton = _addButton( 171, false, 0, -1, false, -1, _("##cancelBtnTooltip##") );
   _d->cancelButton->setGeometry( Rect( Point( 13, 421 ), Size( 39, 22 ) ) );
+  _d->cancelButton->setEnabled( false );
+
   _d->messageButton = _addButton( 115, false, 0, -1, false, -1, _("##messageBtnTooltip##") );
   _d->messageButton->setGeometry( Rect( Point( 63, 421 ), Size( 39, 22 ) ) );
   _d->disasterButton = _addButton( 119, false, 0, -1, false, -1, _("##disasterBtnTooltip##") );
@@ -503,7 +506,7 @@ void ExtentMenu::toggleOverlayMenuVisible()
 
 void ExtentMenu::changeOverlay(int ovType)
 {
-  std::string layerName = citylayer::Helper::instance().findName( (citylayer::Type)ovType );
+  std::string layerName = citylayer::Helper::prettyName( (citylayer::Type)ovType );
   _d->overlaysButton->setText( _( layerName ) );
 }
 
@@ -511,9 +514,9 @@ Signal1<int>& ExtentMenu::onSelectOverlayType() {  return _d->overlaysMenu->onSe
 Signal0<>& ExtentMenu::onEmpireMapShow(){  return _d->empireButton->onClicked(); }
 Signal0<>& ExtentMenu::onAdvisorsWindowShow(){  return _d->senateButton->onClicked(); }
 Signal0<>& ExtentMenu::onSwitchAlarm(){  return _d->disasterButton->onClicked(); }
-Signal0<>&ExtentMenu::onMessagesShow()  { return _d->messageButton->onClicked(); }
-Signal0<>&ExtentMenu::onRotateRight() { return _d->rotateRightButton->onClicked(); }
-Signal0<>&ExtentMenu::onRotateLeft() { return _d->rotateLeftButton->onClicked(); }
+Signal0<>& ExtentMenu::onMessagesShow()  { return _d->messageButton->onClicked(); }
+Signal0<>& ExtentMenu::onRotateRight() { return _d->rotateRightButton->onClicked(); }
+Signal0<>& ExtentMenu::onRotateLeft() { return _d->rotateLeftButton->onClicked(); }
 Signal0<>& ExtentMenu::onMissionTargetsWindowShow(){  return _d->missionButton->onClicked(); }
 
 void ExtentMenu::setAlarmEnabled( bool enabled ){  _d->disasterButton->setEnabled( enabled );}

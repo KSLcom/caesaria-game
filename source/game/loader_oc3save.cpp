@@ -23,6 +23,7 @@
 #include "game.hpp"
 #include "core/saveadapter.hpp"
 #include "player.hpp"
+#include "core/variant_map.hpp"
 #include "city/city.hpp"
 #include "gamedate.hpp"
 #include "world/empire.hpp"
@@ -33,20 +34,24 @@
 #include "core/logger.hpp"
 #include "saver.hpp"
 
-namespace {
-static const int currentVesion = 1;
-}
+namespace game
+{
 
-class GameLoaderOc3::Impl
+namespace loader
+{
+
+static const int currentVesion = 1;
+
+class OC3::Impl
 {
 public:
   std::string restartFile;
 };
 
-bool GameLoaderOc3::load( const std::string& filename, Game& game )
+bool OC3::load( const std::string& filename, Game& game )
 {
   Logger::warning( "GameLoaderOc3: start loading from " + filename );
-  VariantMap vm = SaveAdapter::load( filename );
+  VariantMap vm = config::load( filename );
   if( vm.empty() )
   {
     Logger::warning( "GameLoaderOc3: empty file " + filename );
@@ -61,12 +66,12 @@ bool GameLoaderOc3::load( const std::string& filename, Game& game )
     VariantMap scenario_vm = vm[ "scenario" ].toMap();
     game.setTimeMultiplier( (int)vm[ "timemultiplier"] );
 
-    GameDate::instance().init( scenario_vm[ "date" ].toDateTime() );
+    game::Date::instance().init( scenario_vm[ "date" ].toDateTime() );
     events::Dispatcher::instance().load( scenario_vm[ "events" ].toMap() );
 
     Variant lastTr = scenario_vm[ "translation" ];
     Locale::addTranslation( lastTr.toString() );
-    GameSettings::set( GameSettings::lastTranslation, lastTr );
+    SETTINGS_SET_VALUE( lastTranslation, lastTr );
 
     game.player()->load( vm[ "player" ].toMap() );
     game.city()->load( vm[ "city" ].toMap() );
@@ -82,23 +87,27 @@ bool GameLoaderOc3::load( const std::string& filename, Game& game )
   return false;
 }
 
-int GameLoaderOc3::climateType(const std::string& filename)
+int OC3::climateType(const std::string& filename)
 {
   Logger::warning( "GameLoaderOc3: check climate type" + filename );
-  VariantMap vm = SaveAdapter::load( filename );
+  VariantMap vm = config::load( filename );
   VariantMap scenario_vm = vm[ "scenario" ].toMap();
 
   return scenario_vm.get( "climate", -1 );
 }
 
-bool GameLoaderOc3::isLoadableFileExtension( const std::string& filename )
+bool OC3::isLoadableFileExtension( const std::string& filename )
 {
-  return filename.substr( filename.size() - 8 ) == ".oc3save";
+  return vfs::Path( filename ).isMyExtension( ".oc3save" );
 }
 
-std::string GameLoaderOc3::restartFile() const { return _d->restartFile; }
+std::string OC3::restartFile() const { return _d->restartFile; }
 
-GameLoaderOc3::GameLoaderOc3() : _d( new Impl )
+OC3::OC3() : _d( new Impl )
 {
 
 }
+
+}//end namespace loader
+
+}//end namespace game

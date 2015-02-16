@@ -21,11 +21,11 @@
 #include "memfile.hpp"
 #include "core/logger.hpp"
 
-#include "zlib/zlib.h"
-#include "lzma/LzmaDec.h"
-#include "bzip2/bzlib.h"
-#include "aes/fileenc.h"
-#include "core/stringhelper.hpp"
+#include <zlib.h>
+#include <LzmaDec.h>
+#include <bzlib.h>
+#include <fileenc.h>
+#include "core/utils.hpp"
 
 namespace vfs
 {
@@ -47,10 +47,10 @@ bool ZipArchiveLoader::isALoadableFileFormat(const Path& filename) const
 {
     std::string fileExtension = filename.extension();
     Logger::warning( "ZipArchiveLoader: extension is " + fileExtension );
-    return StringHelper::isEquale( fileExtension, ".zip", StringHelper::equaleIgnoreCase )
-           || StringHelper::isEquale( fileExtension, ".pk3", StringHelper::equaleIgnoreCase )
-           || StringHelper::isEquale( fileExtension, ".gz", StringHelper::equaleIgnoreCase )
-           || StringHelper::isEquale( fileExtension, ".tgz", StringHelper::equaleIgnoreCase );
+    return utils::isEquale( fileExtension, ".zip", utils::equaleIgnoreCase )
+           || utils::isEquale( fileExtension, ".pk3", utils::equaleIgnoreCase )
+           || utils::isEquale( fileExtension, ".gz", utils::equaleIgnoreCase )
+           || utils::isEquale( fileExtension, ".tgz", utils::equaleIgnoreCase );
 }
 
 //! Check to see if the loader can create archives of this type.
@@ -126,8 +126,8 @@ ZipArchiveReader::ZipArchiveReader( NFile file, bool ignoreCase, bool ignorePath
  : Entries( (file.isOpen() ? file.path() : Path("") ), ignoreCase ? Path::ignoreCase : Path::equaleCase, ignorePaths),
    File(file), _d( new Impl )
 {
-	#ifdef _DEBUG
-    FileList::setDebugName( "ZipReader");
+  #ifdef _DEBUG
+    //setDebugName("ZipReader");
   #endif
 
   _d->isGZip = isGZip;

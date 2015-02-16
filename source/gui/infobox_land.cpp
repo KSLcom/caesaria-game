@@ -19,9 +19,11 @@
 #include "label.hpp"
 #include "core/gettext.hpp"
 #include "city/city.hpp"
-#include "core/stringhelper.hpp"
+#include "objects/road.hpp"
+#include "core/utils.hpp"
 #include "objects/constants.hpp"
 #include "pathway/pathway_helper.hpp"
+#include "dictionary.hpp"
 
 using namespace constants;
 using namespace gfx;
@@ -46,6 +48,7 @@ AboutLand::AboutLand(Widget* parent, PlayerCityPtr city, const Tile& tile )
   if( tile.pos() == city->borderInfo().roadExit )
   {
     title = "##to_empire_road##";
+    _helpUri = "road_to_empire";
     text = "";
   }
   else if( tile.pos() == city->borderInfo().boatEntry )
@@ -56,57 +59,72 @@ AboutLand::AboutLand(Widget* parent, PlayerCityPtr city, const Tile& tile )
   else if( tile.getFlag( Tile::tlTree ) )
   {
     title = "##trees_and_forest_caption##";
-    text = "##trees_and_forest_text##";
+    _helpUri = "trees";
+    text = "##trees_and_forest_text##";    
   } 
   else if( tile.getFlag( Tile::tlWater ) )
   {
-    title = "##water_caption##";    
+    std::string typeStr = tile.getFlag( Tile::tlCoast )
+                            ? "##coast"
+                            : "##water";
+    title = typeStr + "_caption##";
 
     TilePos exitPos = city->borderInfo().boatEntry;
     Pathway way = PathwayHelper::create( tile.pos(), exitPos, PathwayHelper::deepWaterFirst );
 
-    text = way.isValid() ? "##water_text##" : "##inland_lake_text##";
+    text = way.isValid()
+             ? (typeStr + "_text##")
+             : "##inland_lake_text##";
+    _helpUri = "water";
   }
   else if( tile.getFlag( Tile::tlRock ) )
   {
     title = "##rock_caption##";
+    _helpUri = "rock";
     text = "##rock_text##";
   }
   else if( tile.getFlag( Tile::tlRoad ) )
   {
-    if( tile.overlay()->type() == construction::plaza )
+    int ovType = tile.overlay().isValid() ? tile.overlay()->type() : objects::unknown;
+    if(ovType == objects::plaza )
     {
       title = "##plaza_caption##";
+      _helpUri = "plaza";
       text = "##plaza_text##";
     }
-    else if( tile.overlay()->type() == construction::road )
+    else if( ovType == objects::road )
     {
-      title = "##road_caption##";
+      _helpUri = "paved_road";
+      RoadPtr road = ptr_cast<Road>( tile.overlay() );
+      title = road->pavedValue() > 0 ? "##road_paved_caption##" : "##road_caption##";
       if( tile.pos() == city->borderInfo().roadEntry ) { text = "##road_from_rome##"; }
       else if( tile.pos() == city->borderInfo().roadExit ) { text = "##road_to_distant_region##"; }
-      else text = "##road_text##";
+      else text = road->pavedValue() > 0 ? "##road_paved_text##" : "##road_text##";
     }
     else
     {
       title = "##road_caption##";
+      _helpUri = "road";
       text = "##road_unknown_text##";
     }
   }
   else if( tile.getFlag( Tile::tlMeadow ) )
   {
     title = "##meadow_caption##";
+    _helpUri = "meadow";
     text = "##meadow_text##";
   }
   else 
   {
     title = "##clear_land_caption##";
+    _helpUri = "clear_land";
     text = "##clear_land_text##";
   }
   
   //int index = (size - tile.getJ() - 1 + border_size) * 162 + tile.getI() + border_size;
 
   text = _(text );
-  text += StringHelper::format( 0xff, "\nTile at: (%d,%d) ID:%04X",
+  text += utils::format( 0xff, "\nTile at: (%d,%d) ID:%04X",
                                            tile.i(), tile.j(),  
                                           ((short int) tile.originalImgId() ) );
   
@@ -118,6 +136,11 @@ void AboutLand::setText( const std::string& text )
 {
   if( Widget* lb = findChild( lbTextId ) )
     lb->setText( text );
+}
+
+void AboutLand::_showHelp()
+{
+  DictionaryWindow::show( this, _helpUri );
 }
 
 AboutFreeHouse::AboutFreeHouse( Widget* parent, PlayerCityPtr city, const Tile& tile )
@@ -133,7 +156,12 @@ AboutFreeHouse::AboutFreeHouse( Widget* parent, PlayerCityPtr city, const Tile& 
   else
   {
     setText( _("##freehouse_text##") );
-  }
+    }
+}
+
+void AboutFreeHouse::_showHelp()
+{
+  DictionaryWindow::show( this, "vacant_lot" );
 }
 
 }

@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU General Public License
 // along with CaesarIA.  If not, see <http://www.gnu.org/licenses/>.
 //
-// Copyright 2012-2014 Dalerank, dalerankn8@gmail.com
+// Copyright 2012-2015 Dalerank, dalerankn8@gmail.com
 
 #ifndef _CAESARIA_WINDOW_PLAYERNAME_H_INCLUDE_
 #define _CAESARIA_WINDOW_PLAYERNAME_H_INCLUDE_
@@ -25,16 +25,21 @@
 namespace gui
 {
 
-class WindowPlayerName : public Window
+namespace dialog
+{
+
+class ChangePlayerName : public Window
 {
 public:
-  WindowPlayerName( Widget* parent );
-  virtual ~WindowPlayerName();
+  ChangePlayerName( Widget* parent );
+  virtual ~ChangePlayerName();
 
   virtual std::string text() const;
   virtual void setModal();
+  virtual bool onEvent(const NEvent &event);
 
-public oc3_signals:
+public signals:
+  Signal0<>& onNewGame();
   Signal0<>& onClose();
   Signal1<std::string>& onNameChange();
 
@@ -42,6 +47,8 @@ private:
   class Impl;
   ScopedPtr< Impl > _d;
 };
+
+}//end namespace dialog
 
 }//end namespace gui
 #endif //_CAESARIA_WINDOW_PLAYERNAME_H_INCLUDE_

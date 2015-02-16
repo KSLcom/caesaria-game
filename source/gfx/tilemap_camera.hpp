@@ -37,7 +37,7 @@ public:
   TilemapCamera();
   virtual ~TilemapCamera();
 
-  void init( Tilemap& tilemap );
+  void init( Tilemap& tilemap, Size size );
 
   // size of the view in pixel
   void setViewport(Size newSize);
@@ -69,11 +69,12 @@ public:
   virtual void startFrame();
   virtual void refresh();
 
-public oc3_signals:
+public signals:
   virtual Signal1<Point>& onPositionChanged();
+  virtual Signal1<constants::Direction>& onDirectionChanged();
   
 private:
-  void setCenter(Point pos);
+  void _setCenter(Point pos, bool checkBorder);
 
   class Impl;
   ScopedPtr< Impl > _d;

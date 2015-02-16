@@ -33,7 +33,9 @@ namespace advisorwnd
 class GoodOrderManageWindow : public Window
 {
 public:
-  GoodOrderManageWindow( Widget* parent, const Rect& rectangle, PlayerCityPtr city, Good::Type type, int stackedGoods );
+  typedef enum { gmUnknown=0, gmImport=0x1, gmProduce=0x2 } GoodMode;
+  GoodOrderManageWindow( Widget* parent, const Rect& rectangle, PlayerCityPtr city,
+                         good::Product type, int stackedGoods, GoodMode gmode );
 
   virtual void draw( gfx::Engine& painter );
 
@@ -55,10 +57,12 @@ public:
 
   void updateStackingState();
 
-oc3_signals public:
+signals public:
   Signal0<> &onOrderChanged();
 
 private:
+  void _changeTradeLimit( int value );
+
   class Impl;
   ScopedPtr<Impl> _d;
 };

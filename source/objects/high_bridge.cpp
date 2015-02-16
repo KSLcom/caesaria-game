@@ -16,21 +16,24 @@
 #include "high_bridge.hpp"
 #include "gfx/picture.hpp"
 #include "game/resourcegroup.hpp"
-#include "gfx/tile.hpp"
+#include "gfx/helper.hpp"
 #include "city/helper.hpp"
 #include "gfx/tilemap.hpp"
 #include "events/build.hpp"
+#include "core/variant_map.hpp"
 #include "constants.hpp"
 #include "walker/walker.hpp"
-#include <vector>
+#include "events/clearland.hpp"
 #include <core/logger.hpp>
+#include "objects_factory.hpp"
 
 using namespace constants;
 using namespace gfx;
 
+REGISTER_CLASS_IN_OVERLAYFACTORY(objects::high_bridge, HighBridge)
+
 namespace {
   const Point spanswOffset = Point( 12, -43 );
-
 }
 
 class HighBridgeSubTile : public Construction
@@ -41,13 +44,13 @@ public:
           liftingWestL=173, descentWestL=175,
           liftingNorthL=176, descentNorthL=178 };
   HighBridgeSubTile( const TilePos& pos, int index )
-    : Construction( building::highBridge, Size( 1 ) )
+    : Construction( objects::high_bridge, Size( 1 ) )
   {
     _pos = pos;
     _index = index;
 
     Picture pic = Picture::load( ResourceGroup::transport, _index );
-    pic.addOffset( TileHelper::tilepos2screen( _pos ) );
+    pic.addOffset( tile::tilepos2screen( _pos ) );
     setPicture( pic );
 
     //checkSecondPart();
@@ -62,13 +65,13 @@ public:
   bool isWalkable() const   {    return true;  }
   bool isNeedRoadAccess() const { return false; }
 
-  bool build( PlayerCityPtr city, const TilePos& pos )
+  bool build( const CityAreaInfo& info )
   {
     if( _index == descentNorth || _index == liftingNorth )
     {
       setSize( Size( 1, 2 ) );
     }
-    else if( _index == descentWest )
+    else if( _index == descentWest || _index == liftingWest )
     {
       setSize( Size( 2, 1 ) );
     }
@@ -78,54 +81,78 @@ public:
       return false;
     }
 
-    Construction::build( city, pos );
+    Construction::build( info );
 
     setPicture( Picture::getInvalid() );
     _fgPicturesRef().clear();
     Picture pic = Picture::load( ResourceGroup::transport, _index);
 
+    const TilePos& pos = info.pos;
     if( _index == descentNorth )
     {
-      Tile& mt = city->tilemap().at( pos + TilePos( 0, 1 ) );
-      city->tilemap().at( pos + TilePos( 0, 1 ) ).setMasterTile( 0 );
-      city->tilemap().at( pos ).setMasterTile( &mt );
+      Tile& mt = info.city->tilemap().at( pos + TilePos( 0, 1 ) );
+      info.city->tilemap().at( pos + TilePos( 0, 1 ) ).setMasterTile( 0 );
+      info.city->tilemap().at( pos ).setMasterTile( &mt );
 
       pic.addOffset( -30, -15 );
       _fgPicturesRef().push_back( pic );
     }
     else if( _index == liftingNorth )
     {
-      Tile& mt = city->tilemap().at( pos + TilePos( 0, 1 ) );
+      Tile& mt = info.city->tilemap().at( pos + TilePos( 0, 1 ) );
       Picture landPic = mt.picture();
-      landPic.addOffset( TileHelper::tilepos2screen( TilePos( 0, 1 ) ) );
+      landPic.addOffset( tile::tilepos2screen( TilePos( 0, 1 ) ) );
       _fgPicturesRef().push_back( landPic );
+
       _fgPicturesRef().push_back( pic );
     }
     else if( _index == descentWest )
     {
-      Tile& mt = city->tilemap().at( pos + TilePos( 1, 0) );
+      Tile& mt = info.city->tilemap().at( pos + TilePos( 1, 0) );
       Picture landPic = mt.picture();
-      landPic.addOffset(  TileHelper::tilepos2screen( TilePos( 1, 0 ) )  );
+      landPic.addOffset( tile::tilepos2screen( TilePos( 1, 0 ) )  );
       _fgPicturesRef().push_back( landPic );
+
+     pic.addOffset( 8, -14 );
       _fgPicturesRef().push_back( pic );
     }
-    else
+    else if(  _index == liftingWest )
+    {
+      Tile& mt = info.city->tilemap().at( info.pos + TilePos( 1, 0) );
+      Picture landPic = mt.picture();
+      landPic.addOffset( tile::tilepos2screen( TilePos( 1, 0 ) ) );
+      _fgPicturesRef().push_back( landPic );
+
+      pic.addOffset( 0, -15 );
+      _fgPicturesRef().push_back( pic );
+    }
+    else if( _index == footingWest || _index == spanWest )
+    {
+      pic.addOffset( 7, -14 );
       setPicture( pic );
+    }
+    else
+    {
+      setPicture( pic );
+    }
 
     _pos = pos;
 
     return true;
   }
 
+  void hide()
+  {
+    setPicture( Picture::getInvalid() );
+    //_fgPicturesRef().clear();
+  }
+
   void setState( ParameterType name, double value )
   {
-    if( name == Construction::destroyable )
+    if( _parent && name == Construction::destroyable && value )
     {
-      if( _parent )
-         _parent->setState( name, value );
-      value = _parent ? (_parent->canDestroy() ? 1 : 0) : 0;
+      _parent->hide();
     }
-    Construction::setState( name, value );
   }
 
   void initTerrain( Tile& terrain )
@@ -208,32 +235,32 @@ public:
   }
 };
 
-bool HighBridge::canBuild(PlayerCityPtr city, TilePos pos, const TilesArray& ) const
+bool HighBridge::canBuild( const CityAreaInfo& areaInfo ) const
 {
   //bool is_constructible = Construction::canBuild( pos );
 
   TilePos endPos, startPos;
   _d->direction=noneDirection;
   
-  TileOverlayPtr ov = city->getOverlay( pos );
+  TileOverlayPtr ov = areaInfo.city->getOverlay( areaInfo.pos );
   if( ov.isNull() )
   {
     _d->subtiles.clear();
     HighBridge* thisp = const_cast< HighBridge* >( this );
     thisp->_fgPicturesRef().clear();
 
-    _checkParams( city, _d->direction, startPos, endPos, pos );
+    _checkParams( areaInfo.city, _d->direction, startPos, endPos, areaInfo.pos );
 
     if( _d->direction != noneDirection )
     {
-      thisp->_computePictures( city, startPos, endPos, _d->direction );
+      thisp->_computePictures( areaInfo.city, startPos, endPos, _d->direction );
     }
   }
 
   return (_d->direction != noneDirection );
 }
 
-HighBridge::HighBridge() : Construction( building::highBridge, Size(1) ), _d( new Impl )
+HighBridge::HighBridge() : Construction( objects::high_bridge, Size(1) ), _d( new Impl )
 {
   Picture tmp;
   setPicture( tmp );
@@ -452,36 +479,36 @@ void HighBridge::_checkParams(PlayerCityPtr city, Direction& direction, TilePos&
   }
 }
 
-bool HighBridge::build(PlayerCityPtr city, const TilePos& pos )
+bool HighBridge::build( const CityAreaInfo& info  )
 {
   TilePos endPos, startPos;
   _d->direction=noneDirection;
 
   setSize( Size(0) );
-  Construction::build( city, pos );
+  Construction::build( info );
 
   _d->subtiles.clear();
   _fgPicturesRef().clear();
 
-  Tilemap& tilemap = city->tilemap();
+  Tilemap& tilemap = info.city->tilemap();
 
-  _checkParams( city, _d->direction, startPos, endPos, pos );
+  _checkParams( info.city, _d->direction, startPos, endPos, info.pos );
 
   if( _d->direction != noneDirection )
   {    
-    _computePictures( city, startPos, endPos, _d->direction );
+    _computePictures( info.city, startPos, endPos, _d->direction );
    
     foreach( it, _d->subtiles )
     {
       HighBridgeSubTilePtr subtile = *it;
-      TilePos buildPos = pos + subtile->_pos;
+      TilePos buildPos = info.pos + subtile->_pos;
       Tile& tile = tilemap.at( buildPos );
       //subtile->setPicture( tile.picture() );
       subtile->_imgId = tile.originalImgId();
-      subtile->_info = TileHelper::encode( tile );
+      subtile->_info = tile::encode( tile );
       subtile->_parent = this;
       
-      events::GameEventPtr event = events::BuildEvent::create( buildPos, subtile.object() );
+      events::GameEventPtr event = events::BuildAny::create( buildPos, subtile.object() );
       event->dispatch();
     }    
   }
@@ -503,6 +530,11 @@ bool HighBridge::canDestroy() const
     }
   }
 
+  if( !state( Construction::destroyable ) )
+  {
+    _d->error = "##destroy_bridge_warning##";
+  }
+
   return state( Construction::destroyable );
 }
 
@@ -520,7 +552,7 @@ void HighBridge::destroy()
   {
     HighBridgeSubTilePtr subtile = *it;
 
-    events::GameEventPtr event = events::ClearLandEvent::create( subtile->_pos );
+    events::GameEventPtr event = events::ClearTile::create( subtile->_pos );
     event->dispatch();
 
     Tile& mapTile = city->tilemap().at( subtile->_pos );
@@ -554,5 +586,14 @@ void HighBridge::load(const VariantMap& stream)
   for( unsigned int i=0; i < vl_tinfo.size(); i++ )
   {
     _d->subtiles[ i ]->_imgId = vl_tinfo.get( i ).toInt();
+  }
+}
+
+void HighBridge::hide()
+{
+  setState( Construction::destroyable, 1);
+  foreach( it, _d->subtiles )
+  {
+    (*it)->hide();
   }
 }

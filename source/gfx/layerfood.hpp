@@ -16,13 +16,15 @@
 #ifndef __CAESARIA_LAYERFOOD_H_INCLUDED__
 #define __CAESARIA_LAYERFOOD_H_INCLUDED__
 
-#include "layer.hpp"
-#include "city_renderer.hpp"
+#include "layerinfo.hpp"
 
 namespace gfx
 {
 
-class LayerFood : public Layer
+namespace layer
+{
+
+class Food : public Info
 {
 public:
   virtual int type() const;
@@ -33,8 +35,10 @@ public:
   virtual void handleEvent(NEvent& event);
 
 private:
-  LayerFood( Camera& camera, PlayerCityPtr city );
+  Food( Camera& camera, PlayerCityPtr city );
 };
+
+}//
 
 }//end namespace gfx
 

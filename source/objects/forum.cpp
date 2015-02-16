@@ -28,8 +28,10 @@
 #include "core/logger.hpp"
 #include "events/fundissue.hpp"
 #include "city/helper.hpp"
+#include "objects_factory.hpp"
 
 using namespace constants;
+REGISTER_CLASS_IN_OVERLAYFACTORY(objects::forum, Forum)
 
 class Forum::Impl
 {
@@ -39,7 +41,7 @@ public:
   void removeMoney( PlayerCityPtr city );
 };
 
-Forum::Forum() : ServiceBuilding(Service::forum, building::forum, Size(2)), _d( new Impl )
+Forum::Forum() : ServiceBuilding(Service::forum, objects::forum, Size(2)), _d( new Impl )
 {
   _d->taxValue = 0;
   setPicture( ResourceGroup::govt, 10 );
@@ -98,16 +100,22 @@ void Forum::collapse()
 
 float Forum::collectTaxes()
 {
-  float taxes = _d->taxValue;
-  _d->taxValue = 0;
-  return taxes;
+  int save = 0;
+
+  if( _d->taxValue > 1 )
+  {
+    save = floor( _d->taxValue );
+    _d->taxValue -= save;
+  }
+
+  return save;
 }
 
 void Forum::Impl::removeMoney(PlayerCityPtr city)
 {
   city::Helper helper( city );
   SenatePtr senate;
-  SenateList senates = helper.find<Senate>( building::senate );
+  SenateList senates = helper.find<Senate>( objects::senate );
   if( !senates.empty() )
     senate = senates.front();
 

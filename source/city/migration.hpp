@@ -30,7 +30,7 @@ class Migration : public Srvc
 public:
   static SrvcPtr create( PlayerCityPtr city );
 
-  virtual void update( const unsigned int time );
+  virtual void timeStep( const unsigned int time );
 
   int value() const;
   std::string reason() const;
@@ -38,9 +38,14 @@ public:
 
   static std::string defaultName();
 
+  int lastMonthComing() const;
+  int lastMonthLeaving() const;
+
   int lastMonthMigration() const;
   virtual VariantMap save() const;
   virtual void load(const VariantMap& stream);
+
+  void citizenLeaveCity( WalkerPtr walker );
 
 private:
   Migration( PlayerCityPtr city );

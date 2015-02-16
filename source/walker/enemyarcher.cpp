@@ -22,9 +22,8 @@
 #include "gfx/tile.hpp"
 #include "gfx/tilemap.hpp"
 #include "city/city.hpp"
-#include "core/variant.hpp"
 #include "name_generator.hpp"
-#include "core/stringhelper.hpp"
+#include "core/utils.hpp"
 #include "events/event.hpp"
 #include "core/logger.hpp"
 #include "objects/constants.hpp"
@@ -34,10 +33,14 @@
 #include "animals.hpp"
 #include "spear.hpp"
 #include "helper.hpp"
+#include "core/variant_map.hpp"
 #include "core/foreach.hpp"
 #include "game/gamedate.hpp"
+#include "walkers_factory.hpp"
 
 using namespace constants;
+
+REGISTER_SOLDIER_IN_WALKERFACTORY( walker::etruscanArcher, walker::etruscanArcher, EnemyArcher, etruscanArcher )
 
 EnemyArcher::EnemyArcher(PlayerCityPtr city, walker::Type type )
   : EnemySoldier( city, type )
@@ -50,7 +53,7 @@ void EnemyArcher::_fire( TilePos p )
 {
   SpearPtr spear = Spear::create( _city() );
   spear->toThrow( pos(), p );
-  wait( GameDate::days2ticks( 1 ) / 2 );
+  wait( game::Date::days2ticks( 1 ) / 2 );
 }
 
 void EnemyArcher::_waitFinished()

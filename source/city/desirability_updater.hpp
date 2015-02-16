@@ -29,16 +29,16 @@ class DesirabilityUpdater : public Srvc
 {
 public:
   static SrvcPtr create(PlayerCityPtr city);
-  virtual void update( const unsigned int time);
+  virtual void timeStep(const unsigned int time);
   static std::string defaultName();
   virtual bool isDeleted() const;
-  virtual void destroy();
+  virtual void destroy( PlayerCityPtr city );
 
   virtual void load(const VariantMap &stream);
   virtual VariantMap save() const;
 
 private:
-  DesirabilityUpdater(PlayerCityPtr city);
+  DesirabilityUpdater( PlayerCityPtr city );
 
   class Impl;
   ScopedPtr<Impl> _d;

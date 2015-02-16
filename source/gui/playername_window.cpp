@@ -13,32 +13,34 @@
 // You should have received a copy of the GNU General Public License
 // along with CaesarIA.  If not, see <http://www.gnu.org/licenses/>.
 //
-// Copyright 2012-2014 Dalerank, dalerankn8@gmail.com
+// Copyright 2012-2015 Dalerank, dalerankn8@gmail.com
 
 #include "playername_window.hpp"
 #include "editbox.hpp"
 #include "pushbutton.hpp"
-#include "core/stringhelper.hpp"
+#include "core/utils.hpp"
 #include "core/logger.hpp"
-#include "widgetescapecloser.hpp"
+#include "core/event.hpp"
 #include "widget_helper.hpp"
 
 namespace gui
 {
 
-class WindowPlayerName::Impl
+namespace dialog
 {
-public oc3_signals:
+
+class ChangePlayerName::Impl
+{
+public signals:
   Signal1<std::string> onNameChangeSignal;
   Signal0<> onCloseSignal;
+  Signal0<> onNewGameSignal;
 };
 
-WindowPlayerName::WindowPlayerName(Widget* parent)
+ChangePlayerName::ChangePlayerName(Widget* parent)
   : Window( parent, Rect( 0, 0, 10, 10 ), "", -1 ), _d( new Impl )
 {
   Widget::setupUI( ":/gui/playername.gui" );
-
-  WidgetEscapeCloser::insertTo( this );
 
   setCenter( parent->center() );
 
@@ -47,25 +49,40 @@ WindowPlayerName::WindowPlayerName(Widget* parent)
   GET_WIDGET_FROM_UI( edPlayerName )
   GET_WIDGET_FROM_UI( btnContinue )
 
-  CONNECT( edPlayerName, onTextChanged(), &_d->onNameChangeSignal, Signal1<std::string>::emit );
-  CONNECT( btnContinue, onClicked(), &_d->onCloseSignal, Signal0<>::emit );
-  CONNECT( edPlayerName, onEnterPressed(), &_d->onCloseSignal, Signal0<>::emit );
+  CONNECT( edPlayerName, onTextChanged(), &_d->onNameChangeSignal, Signal1<std::string>::_emit );
+  CONNECT( btnContinue, onClicked(), &_d->onNewGameSignal, Signal0<>::_emit );
+  CONNECT( edPlayerName, onEnterPressed(), &_d->onNewGameSignal, Signal0<>::_emit );
 
   if( edPlayerName )
   {
     edPlayerName->moveCursor( edPlayerName->text().length() );
   }
+
+  setModal();
 }
 
-WindowPlayerName::~WindowPlayerName(){}
+bool ChangePlayerName::onEvent(const NEvent& event)
+{
+  if( event.EventType == sEventKeyboard && !event.keyboard.pressed && event.keyboard.key == KEY_ESCAPE )
+  {
+    deleteLater();
+    emit _d->onCloseSignal();
 
-std::string WindowPlayerName::text() const
+    return true;
+  }
+
+  return Window::onEvent( event );
+}
+
+ChangePlayerName::~ChangePlayerName(){}
+
+std::string ChangePlayerName::text() const
 {
   const EditBox* ed = findChildA<EditBox*>( "edPlayerName", true, this );
   return ed ? ed->text() : "";
 }
 
-void WindowPlayerName::setModal()
+void ChangePlayerName::setModal()
 {
   Window::setModal();
 
@@ -75,7 +92,10 @@ void WindowPlayerName::setModal()
   if( edPlayerName ) edPlayerName->setFocus();
 }
 
-Signal0<>& WindowPlayerName::onClose(){  return _d->onCloseSignal;}
-Signal1<std::string>& WindowPlayerName::onNameChange(){  return _d->onNameChangeSignal;}
+Signal0<>& ChangePlayerName::onClose(){  return _d->onCloseSignal;}
+Signal0<>& ChangePlayerName::onNewGame(){  return _d->onNewGameSignal;}
+Signal1<std::string>& ChangePlayerName::onNameChange(){  return _d->onNameChangeSignal;}
+
+}//end namespace dialog
 
 }//end namespace gui

@@ -24,13 +24,14 @@
 #include "gfx/tile.hpp"
 #include "city/helper.hpp"
 #include "good/goodhelper.hpp"
-#include "core/stringhelper.hpp"
+#include "core/utils.hpp"
 #include "game/gamedate.hpp"
 #include "world/empire.hpp"
 #include "funds.hpp"
 #include "core/foreach.hpp"
 #include "sentiment.hpp"
 #include "cityservice_peace.hpp"
+#include "core/variant_map.hpp"
 #include "statistic.hpp"
 #include "cityservice_military.hpp"
 
@@ -55,7 +56,7 @@ public:
   Info::MaxParameters maxParams;
 };
 
-SrvcPtr Info::create(PlayerCityPtr city )
+SrvcPtr Info::create( PlayerCityPtr city )
 {
   SrvcPtr ret( new Info( city ) );
   ret->drop();
@@ -64,73 +65,73 @@ SrvcPtr Info::create(PlayerCityPtr city )
 }
 
 Info::Info( PlayerCityPtr city )
-  : Srvc( *city.object(), defaultName() ), _d( new Impl )
+  : Srvc( city, defaultName() ), _d( new Impl )
 {
-  _d->lastDate = GameDate::current();
+  _d->lastDate = game::Date::current();
   _d->lastYearHistory.resize( 12 );
   _d->maxParams.resize( paramsCount );
 }
 
-void Info::update( const unsigned int time )
+void Info::timeStep(const unsigned int time )
 {
-  if( !GameDate::isMonthChanged() )
+  if( !game::Date::isMonthChanged() )
     return;
 
-  if( GameDate::current().month() != _d->lastDate.month() )
+  if( game::Date::current().month() != _d->lastDate.month() )
   {
-    bool yearChanged = GameDate::current().year() != _d->lastDate.year();
-    _d->lastDate = GameDate::current();
+    bool yearChanged = game::Date::current().year() != _d->lastDate.year();
+    _d->lastDate = game::Date::current();
 
     _d->lastYearHistory.erase( _d->lastYearHistory.begin() );
     _d->lastYearHistory.push_back( Parameters() );
 
     Parameters& last = _d->lastYearHistory.back();
     last.date = _d->lastDate;
-    last[ population  ] = _city.population();
-    last[ funds       ] = _city.funds().treasury();
+    last[ population  ] = _city()->population();
+    last[ funds       ] = _city()->funds().treasury();
     last[ taxpayes    ] =  0;//_d->city->getLastMonthTaxpayer();
-    last[ foodStock   ] = city::Statistic::getFoodStock( &_city );
-    last[ foodMontlyConsumption ] = city::Statistic::getFoodMonthlyConsumption( &_city );
+    last[ foodStock   ] = statistic::getFoodStock( _city() );
+    last[ foodMontlyConsumption ] = statistic::getFoodMonthlyConsumption( _city() );
     last[ monthWithFood ] = last[ foodMontlyConsumption ] > 0 ? (last[ foodStock ] / last[ foodMontlyConsumption ]) : 0;
 
-    int foodProducing = city::Statistic::getFoodProducing( &_city );
+    int foodProducing = statistic::getFoodProducing( _city() );
     int yearlyFoodConsumption = last[ foodMontlyConsumption ] * DateTime::monthsInYear;
     last[ foodKoeff   ] = ( foodProducing - yearlyFoodConsumption > 0 )
                             ? foodProducing / (yearlyFoodConsumption+1)
                             : -(yearlyFoodConsumption / (foodProducing+1) );
 
     int currentWorkers, rmaxWorkers;
-    city::Statistic::getWorkersNumber( &_city, currentWorkers, rmaxWorkers );
+    statistic::getWorkersNumber( _city(), currentWorkers, rmaxWorkers );
 
     last[ needWorkers ] = rmaxWorkers - currentWorkers;
     last[ maxWorkers  ] = rmaxWorkers;
-    last[ workless    ] = city::Statistic::getWorklessPercent( &_city );
-    last[ payDiff     ] = _city.empire()->workerSalary() - _city.funds().workerSalary();
-    last[ tax         ] = _city.funds().taxRate();
-    last[ cityWages   ] = _city.funds().workerSalary();
-    last[ romeWages   ] = _city.empire()->workerSalary();
-    last[ crimeLevel  ] = city::Statistic::getCrimeLevel( &_city );
-    last[ favour      ] = _city.favour();
-    last[ prosperity  ] = _city.prosperity();
-    last[ monthWtWar  ] = city::Statistic::months2lastAttack( &_city );
+    last[ workless    ] = statistic::getWorklessPercent( _city() );
+    last[ payDiff     ] = _city()->empire()->workerSalary() - _city()->funds().workerSalary();
+    last[ tax         ] = _city()->funds().taxRate();
+    last[ cityWages   ] = _city()->funds().workerSalary();
+    last[ romeWages   ] = _city()->empire()->workerSalary();
+    last[ crimeLevel  ] = statistic::getCrimeLevel( _city() );
+    last[ favour      ] = _city()->favour();
+    last[ prosperity  ] = _city()->prosperity();
+    last[ monthWtWar  ] = statistic::months2lastAttack( _city() );
     last[ peace       ] = 0;
 
     PeacePtr peaceSrvc;
-    peaceSrvc << _city.findService( Peace::getDefaultName() );
+    peaceSrvc << _city()->findService( Peace::defaultName() );
     if( peaceSrvc.isValid() )
     {
       last[ peace ] = peaceSrvc->value();
     }
 
     MilitaryPtr mil;
-    mil << _city.findService( Military::defaultName() );
+    mil << _city()->findService( Military::defaultName() );
     if( mil.isValid() )
     {
-      last[ Info::milthreat ] = mil->threadValue();
+      last[ Info::milthreat ] = mil->threatValue();
     }
 
-    Helper helper( &_city );
-    HouseList houses = helper.find<House>( building::house );
+    Helper helper( _city() );
+    HouseList houses = helper.find<House>( objects::house );
 
     last[ houseNumber ] = 0;
     last[ shackNumber ] = 0;
@@ -148,7 +149,7 @@ void Info::update( const unsigned int time )
     }
 
     SentimentPtr st;
-    st << _city.findService( Sentiment::defaultName() );
+    st << _city()->findService( Sentiment::defaultName() );
 
     last[ sentiment ] = st->value();
 
@@ -166,7 +167,7 @@ void Info::update( const unsigned int time )
 
 Info::Parameters Info::lastParams() const {  return _d->lastYearHistory.empty() ? Parameters() : _d->lastYearHistory.back(); }
 
-Info::Parameters Info::params(int monthAgo) const
+Info::Parameters Info::params(unsigned int monthAgo) const
 {
   if( _d->lastYearHistory.empty() )
     return Parameters();
@@ -177,7 +178,7 @@ Info::Parameters Info::params(int monthAgo) const
   return _d->lastYearHistory[ monthAgo ];
 }
 
-Info::Parameters Info::yearParams(int year) const
+Info::Parameters Info::yearParams(unsigned int year) const
 {
   if( _d->allHistory.empty() )
     return Parameters();
@@ -206,7 +207,7 @@ VariantMap Info::save() const
   VariantMap currentVm;
   foreach( i, _d->lastYearHistory )
   {
-    stepName = StringHelper::format( 0xff, "%02d", step++ );
+    stepName = utils::format( 0xff, "%02d", step++ );
     currentVm[ stepName ] = (*i).save();
   }
   ret[ lc_lastHistory ] = currentVm;
@@ -215,7 +216,7 @@ VariantMap Info::save() const
   VariantMap allVm;
   foreach( i, _d->allHistory )
   {
-    stepName = StringHelper::format( 0xff, "%04d", step++ );
+    stepName = utils::format( 0xff, "%04d", step++ );
     allVm[ stepName ] = (*i).save();
   }
   ret[ lc_allHistory ] = allVm;
@@ -224,7 +225,7 @@ VariantMap Info::save() const
   VariantMap messagesVm;
   foreach( i, _d->messages )
   {
-    stepName = StringHelper::format( 0xff, "%04d", step++ );
+    stepName = utils::format( 0xff, "%04d", step++ );
     messagesVm[ stepName ] = (*i).save();
   }
   ret[ lc_messages ] = messagesVm;
@@ -235,7 +236,7 @@ VariantMap Info::save() const
     VariantList paramVm;
     paramVm << _d->maxParams[ k ].date;
     paramVm << _d->maxParams[ k ].value;
-    maxParamVm[ StringHelper::format( 0xff, "%02d", k ) ] = paramVm;
+    maxParamVm[ utils::format( 0xff, "%02d", k ) ] = paramVm;
   }
   ret[ lc_maxparam ] = maxParamVm;
 
@@ -269,7 +270,7 @@ void Info::load(const VariantMap& stream)
   _d->maxParams.resize( paramsCount );
   foreach( i, maxParamVm )
   {
-    int index = StringHelper::toInt( i->first );
+    int index = utils::toInt( i->first );
     DateTime date = i->second.toList().get( 0 ).toDateTime();
     int value = i->second.toList().get( 1 ).toInt();
     _d->maxParams[ index ].date = date;
@@ -356,7 +357,7 @@ VariantMap Info::ScribeMessage::save() const
   VariantMap ret;
   ret[ lc_text ] = Variant( text );
   ret[ lc_title ] = Variant( title );
-  ret[ lc_gtype ] = Variant( GoodHelper::getTypeName( gtype ) );
+  ret[ lc_gtype ] = Variant( good::Helper::getTypeName( gtype ) );
   ret[ lc_position ] = position;
   VARIANT_SAVE_ANY( ret, type )
   VARIANT_SAVE_ANY( ret, date )
@@ -370,7 +371,7 @@ void Info::ScribeMessage::load(const VariantMap& stream)
 {
   text = stream.get( lc_text ).toString();
   title = stream.get( lc_title ).toString();
-  gtype = GoodHelper::getType( stream.get( lc_gtype ).toString() );
+  gtype = good::Helper::getType( stream.get( lc_gtype ).toString() );
   position = stream.get( lc_position ).toPoint();
   VARIANT_LOAD_ANY( type, stream )
   VARIANT_LOAD_TIME( date, stream )

@@ -18,6 +18,7 @@
 #include "objects/warehouse.hpp"
 #include "objects/granary.hpp"
 #include "city/helper.hpp"
+#include "core/variant_map.hpp"
 #include "game/game.hpp"
 
 using namespace constants;
@@ -25,7 +26,7 @@ using namespace constants;
 namespace events
 {
 
-GameEventPtr RemoveGoods::create( Good::Type type, int qty  )
+GameEventPtr RemoveGoods::create(good::Product type, int qty  )
 {
   RemoveGoods* r = new RemoveGoods();
   r->_qty = qty;
@@ -38,7 +39,7 @@ GameEventPtr RemoveGoods::create( Good::Type type, int qty  )
 }
 
 template<class T>
-void _removeGoodFrom( PlayerCityPtr city, building::Type btype, Good::Type what, int& qty )
+void _removeGoodFrom( PlayerCityPtr city, objects::Type btype, good::Product what, int& qty )
 {
   SmartList<T> bList;	
 #ifdef CAESARIA_PLATFORM_HAIKU
@@ -52,12 +53,12 @@ void _removeGoodFrom( PlayerCityPtr city, building::Type btype, Good::Type what,
     if( qty <= 0 )
       break;
 
-    GoodStore& store = (*it)->store();
+    good::Store& store = (*it)->store();
     int maxQty = std::min( store.getMaxRetrieve( what ), qty );
 
     if( maxQty > 0 )
     {
-      GoodStock stock( what, maxQty );
+      good::Stock stock( what, maxQty );
       store.retrieve( stock, maxQty );
       qty -= maxQty;
     }
@@ -66,8 +67,8 @@ void _removeGoodFrom( PlayerCityPtr city, building::Type btype, Good::Type what,
 
 void RemoveGoods::_exec( Game& game, unsigned int time )
 {
-  _removeGoodFrom<Warehouse>( game.city(), building::warehouse, _type, _qty );
-  _removeGoodFrom<Granary>( game.city(), building::granary, _type, _qty );
+  _removeGoodFrom<Warehouse>( game.city(), objects::warehouse, _type, _qty );
+  _removeGoodFrom<Granary>( game.city(), objects::granery, _type, _qty );
 }
 
 bool RemoveGoods::_mayExec(Game&, unsigned int) const { return true; }

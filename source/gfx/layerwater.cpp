@@ -28,16 +28,19 @@
 #include "tilemap_camera.hpp"
 #include "objects/aqueduct.hpp"
 #include "core/font.hpp"
-#include "core/stringhelper.hpp"
+#include "core/utils.hpp"
 
 using namespace constants;
 
 namespace gfx
 {
 
-int LayerWater::type() const{  return citylayer::water;}
+namespace layer
+{
 
-void LayerWater::drawTile( Engine& engine, Tile& tile, const Point& offset)
+int Water::type() const{  return citylayer::water;}
+
+void Water::drawTile( Engine& engine, Tile& tile, const Point& offset)
 {
   Point screenPos = tile.mappos() + offset;
 
@@ -52,38 +55,19 @@ void LayerWater::drawTile( Engine& engine, Tile& tile, const Point& offset)
   else
   {
     TileOverlayPtr overlay = tile.overlay();
-    switch( overlay->type() )
+    if( _isVisibleObject( overlay->type() ) )
     {
-    // Base set of visible objects
-    case construction::road:
-    case construction::plaza:
-    case construction::garden:
-
-    case building::burnedRuins:
-    case building::collapsedRuins:
-
-    case building::lowBridge:
-    case building::highBridge:
-
-    case building::elevation:
-    case building::rift:
-
-    //water buildings
-    case building::reservoir:
-    case building::fountain:
-    case building::well:
-    case building::aqueduct:
+      // Base set of visible objects
       needDrawAnimations = true;
       areaSize = overlay->size();      
-    break;
-
-    default:
+    }
+    else
     {
       int tileNumber = 0;
       bool haveWater = tile.param( Tile::pFountainWater ) > 0 || tile.param( Tile::pWellWater ) > 0;
       needDrawAnimations = false;
 
-      if ( overlay->type() == building::house )
+      if ( overlay->type() == objects::house )
       {
         HousePtr h = ptr_cast<House>( overlay );
         needDrawAnimations = (h->spec().level() == 1) && h->habitants().empty();
@@ -103,8 +87,6 @@ void LayerWater::drawTile( Engine& engine, Tile& tile, const Point& offset)
         areaSize = 0;
       }
     }
-    break;
-    }
 
     if ( needDrawAnimations )
     {
@@ -118,7 +100,7 @@ void LayerWater::drawTile( Engine& engine, Tile& tile, const Point& offset)
           Font f = Font::create( FONT_2 );
           f.setColor( 0xffff0000 );
           int df = aq->water();
-          f.draw( engine.screen(), StringHelper::format( 0xff, "%x", df), screenPos + Point( 20, -80 ), false );
+          f.draw( engine.screen(), utils::format( 0xff, "%x", df), screenPos + Point( 20, -80 ), false );
         }
 
         int wellValue = tile.param( Tile::pWellWater );
@@ -126,7 +108,7 @@ void LayerWater::drawTile( Engine& engine, Tile& tile, const Point& offset)
         int reservoirWater = tile.param( Tile::pReservoirWater );
         if( wellValue > 0 || fountainValue > 0 || reservoirWater > 0 )
         {
-          std::string text = StringHelper::format( 0xff, "%d/%d/%d", wellValue, fountainValue, reservoirWater );
+          std::string text = utils::format( 0xff, "%d/%d/%d", wellValue, fountainValue, reservoirWater );
           Font f = Font::create( FONT_2 );
           f.setColor( 0xffff0000 );
           f.draw( engine.screen(), text, screenPos + Point( 20, -80 ), false );
@@ -136,7 +118,7 @@ void LayerWater::drawTile( Engine& engine, Tile& tile, const Point& offset)
     }
   }
 
-  if( !needDrawAnimations && ( tile.isWalkable(true) || tile.getFlag( Tile::tlBuilding ) ) )
+  if( !needDrawAnimations && ( tile.isWalkable(true) || tile.getFlag( Tile::tlOverlay ) ) )
   {
     Tilemap& tilemap = _city()->tilemap();
     TilesArray area = tilemap.getArea( tile.pos(), areaSize );
@@ -160,12 +142,12 @@ void LayerWater::drawTile( Engine& engine, Tile& tile, const Point& offset)
   tile.setWasDrawn();
 }
 
-void LayerWater::drawTileW(Engine& engine, Tile& tile, const Point& offset, const int depth)
+void Water::drawWalkerOverlap(Engine& engine, Tile& tile, const Point& offset, const int depth)
 {
 
 }
 
-void LayerWater::handleEvent(NEvent& event)
+void Water::handleEvent(NEvent& event)
 {
   if( event.EventType == sEventKeyboard )
   {
@@ -215,18 +197,21 @@ void LayerWater::handleEvent(NEvent& event)
   Layer::handleEvent( event );
 }
 
-LayerPtr LayerWater::create( Camera& camera, PlayerCityPtr city)
+LayerPtr Water::create( Camera& camera, PlayerCityPtr city)
 {
-  LayerPtr ret( new LayerWater( camera, city ) );
+  LayerPtr ret( new Water( camera, city ) );
   ret->drop();
 
   return ret;
 }
 
-LayerWater::LayerWater( Camera& camera, PlayerCityPtr city)
+Water::Water( Camera& camera, PlayerCityPtr city)
   : Layer( &camera, city )
 {
   _showWaterValue = false;
+  _fillVisibleObjects( citylayer::water );
 }
+
+}//end namespace layer
 
 }//end namespace gfx

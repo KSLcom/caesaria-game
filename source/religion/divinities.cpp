@@ -28,7 +28,8 @@
 #include "walker/fishing_boat.hpp"
 #include "good/goodstore.hpp"
 #include "objects/warehouse.hpp"
-#include "core/stringhelper.hpp"
+#include "core/utils.hpp"
+#include "core/variant_map.hpp"
 
 using namespace constants;
 using namespace gfx;
@@ -52,12 +53,12 @@ void RomeDivinity::load(const VariantMap& vm)
   _service = ServiceHelper::getType( vm.get( "service" ).toString() );
   _pic = Picture::load( vm.get( "image" ).toString() );
   _relation = (float)vm.get( "relation", 100.f );
-  _lastFestival = vm.get( "lastFestivalDate", GameDate::current() ).toDateTime() ;
+  _lastFestival = vm.get( "lastFestivalDate", game::Date::current() ).toDateTime() ;
 
   _shortDesc = vm.get( "shortDesc" ).toString();
   if( _shortDesc.empty() )
   {
-    _shortDesc  = StringHelper::format( 0xff, "##%s_desc##", internalName().c_str() );
+    _shortDesc  = utils::format( 0xff, "##%s_desc##", internalName().c_str() );
   }
   _wrathPoints = vm.get( "wrath" );
   _blessingDone = vm.get( "blessingDone" );
@@ -100,7 +101,7 @@ const Picture&RomeDivinity::picture() const { return _pic; }
 void RomeDivinity::assignFestival(int type)
 {
   //_relation = math::clamp<float>( _relation + type * 10, 0, 100 );
-  _lastFestival = GameDate::current();
+  _lastFestival = game::Date::current();
 }
 
 VariantMap RomeDivinity::save() const
@@ -134,9 +135,19 @@ void RomeDivinity::updateRelation(float income, PlayerCityPtr city)
     _doWrath( city );
     return;
   }
+  else if( income == -102.f )
+  {
+    _doSmallCurse( city );
+    return;
+  }
+  else if( income == -103.f )
+  {
+    _doBlessing( city );
+    return;
+  }
 
   unsigned int minMood = 50 - math::clamp( city->population() / 10, 0u, 50u );
-  int festivalFactor = 12 - std::min( 40, _lastFestival.monthsTo( GameDate::current() ) );
+  int festivalFactor = 12 - std::min( 40, _lastFestival.monthsTo( game::Date::current() ) );
   _needRelation = math::clamp<int>( income + festivalFactor + _effectPoints, minMood, 100 );
 
   _relation += math::signnum( _needRelation - _relation );
@@ -175,14 +186,14 @@ void RomeDivinity::checkAction( PlayerCityPtr city )
     _blessingDone = true;
     _relation -= 50;
   }
-  else if( _wrathPoints >= 20 && !_smallCurseDone && _lastFestival.monthsTo( GameDate::current() ) > 3 )
+  else if( _wrathPoints >= 20 && !_smallCurseDone && _lastFestival.monthsTo( game::Date::current() ) > 3 )
   {
     _doSmallCurse( city );
     _smallCurseDone = true;
     _wrathPoints = 0;
     _relation += 12;
   }
-  else if( _wrathPoints >= 50 && _lastFestival.monthsTo( GameDate::current() ) > 3 )
+  else if( _wrathPoints >= 50 && _lastFestival.monthsTo( game::Date::current() ) > 3 )
   {
     _doWrath( city );
     _wrathPoints = 0;
@@ -199,7 +210,7 @@ RomeDivinity::RomeDivinity()
 }
 
 void RomeDivinity::setInternalName(const std::string& newName){  setDebugName( newName );}
-std::string RomeDivinity::internalName() const{  return getDebugName();}
+std::string RomeDivinity::internalName() const{  return debugName();}
 
 }//end namespace rome
 

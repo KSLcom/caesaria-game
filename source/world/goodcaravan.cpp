@@ -21,6 +21,7 @@
 #include "game/resourcegroup.hpp"
 #include "core/logger.hpp"
 #include "city.hpp"
+#include "core/variant_map.hpp"
 
 namespace world
 {
@@ -30,7 +31,7 @@ class GoodCaravan::Impl
 public:
   CityPtr base;
   std::string destination;
-  SimpleGoodStore store;
+  good::SimpleStore store;
 
   VariantMap options;
 };
@@ -73,7 +74,7 @@ void GoodCaravan::sendTo(CityPtr obj)
   sendTo( ptr_cast<Object>( obj ) );
 }
 
-GoodStore& GoodCaravan::store() { return _d->store; }
+good::Store& GoodCaravan::store() { return _d->store; }
 std::string GoodCaravan::type() const { return CAESARIA_STR_EXT(GoodCaravan); }
 
 void GoodCaravan::timeStep(unsigned int time)
@@ -114,6 +115,9 @@ GoodCaravan::GoodCaravan( CityPtr city )
  : MovableObject( city->empire() ), _d( new Impl )
 {
   _d->base = city;
+  _d->store.setCapacity( 10000 );
+  _d->store.setCapacity( good::goodCount, 10000 );
+
   setSpeed( 3.f );
 
   setPicture( gfx::Picture::load( ResourceGroup::panelBackground, 108 ) );

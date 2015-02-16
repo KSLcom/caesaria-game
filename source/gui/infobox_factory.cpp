@@ -12,11 +12,13 @@
 //
 // You should have received a copy of the GNU General Public License
 // along with CaesarIA.  If not, see <http://www.gnu.org/licenses/>.
+//
+// Copyright 2012-2014 Dalerank, dalerankn8@gmail.com
 
 #include <cstdio>
 
 #include "infobox_factory.hpp"
-#include "core/stringhelper.hpp"
+#include "core/utils.hpp"
 #include "core/gettext.hpp"
 #include "label.hpp"
 #include "image.hpp"
@@ -25,6 +27,9 @@
 #include "environment.hpp"
 #include "objects/shipyard.hpp"
 #include "objects/wharf.hpp"
+#include "core/logger.hpp"
+#include "widget_helper.hpp"
+#include "city/city.hpp"
 
 using namespace constants;
 using namespace gfx;
@@ -35,33 +40,49 @@ namespace gui
 namespace infobox
 {
 
-AboutFactory::AboutFactory( Widget* parent, const Tile& tile)
-  : AboutConstruction( parent, Rect( 0, 0, 510, 256 ), Rect( 16, 147, 510 - 16, 147 + 62) )
+AboutFactory::AboutFactory(Widget* parent, PlayerCityPtr city, const Tile& tile)
+  : AboutConstruction( parent, Rect( 0, 0, 510, 256 ), Rect( 16, 160, 510 - 16, 160 + 42) )
 {
+  setupUI( ":/gui/infoboxfactory.gui" );
+
   FactoryPtr factory = ptr_cast<Factory>( tile.overlay() );
-  setConstruction( ptr_cast<Construction>( factory ) );
+  setBase( ptr_cast<Construction>( factory ) );
   _type = factory->type();
   std::string  title = MetaDataHolder::findPrettyName( factory->type() );
   setTitle( _(title) );
+  _setWorkingVisible( true );
+
+  if( !factory.isValid() )
+  {
+    Logger::warning( "AboutFactory: cant convert base to factory at [%d,%d]", tile.i(), tile.j() );
+    deleteLater();
+    return;
+  }
 
   // paint progress
-  std::string text = StringHelper::format( 0xff, "%s %d%%", _("##rawm_production_complete_m##"), factory->progress() );
-  _lbProduction = new Label( this, Rect( _lbTitleRef()->leftbottom() + Point( 10, 0 ), Size( width() - 32, 25 ) ), text );
+  std::string text = utils::format( 0xff, "%s %d%%", _("##rawm_production_complete_m##"), factory->progress() );
+  Size lbSize( (width() - 20) / 2, 25 );
+  _lbProduction = new Label( this, Rect( _lbTitleRef()->leftbottom() + Point( 10, 0 ), lbSize ), text );
   _lbProduction->setFont( Font::create( FONT_2 ) );
 
-  if( factory->produceGoodType() != Good::none )
+  std::string effciencyText = utils::format( 0xff, "%s %d%%", _("##effciency##"), factory->effciency() );
+  _lbEffciency = new Label( this, _lbProduction->relativeRect() + Point( lbSize.width(), 0 ), effciencyText );
+  _lbEffciency->setFont( Font::create( FONT_2 ) );
+
+
+  if( factory->produceGoodType() != good::none )
   {
-    new Image( this, Point( 10, 10), GoodHelper::picture( factory->produceGoodType() ) );
+    new Image( this, Point( 10, 10), good::Helper::picture( factory->produceGoodType() ) );
   }
 
   // paint picture of in good
-  if( factory->inStockRef().type() != Good::none )
+  if( factory->inStockRef().type() != good::none )
   {
     Label* lbStockInfo = new Label( this, Rect( _lbTitleRef()->leftbottom() + Point( 0, 25 ), Size( width() - 32, 25 ) ) );
-    lbStockInfo->setIcon( GoodHelper::picture( factory->inStockRef().type() ) );
+    lbStockInfo->setIcon( good::Helper::picture( factory->inStockRef().type() ) );
 
-    std::string whatStock = StringHelper::format( 0xff, "##%s_factory_stock##", GoodHelper::getTypeName( factory->inStockRef().type() ).c_str() );
-    std::string text = StringHelper::format( 0xff, "%d %s %s %d",
+    std::string whatStock = utils::format( 0xff, "##%s_factory_stock##", good::Helper::getTypeName( factory->inStockRef().type() ).c_str() );
+    std::string text = utils::format( 0xff, "%d %s %s %d",
                                              factory->inStockRef().qty() / 100,
                                              _(whatStock),
                                              _("##factory_units##"),
@@ -75,18 +96,18 @@ AboutFactory::AboutFactory( Widget* parent, const Tile& tile)
 
   std::string workInfo = factory->workersProblemDesc();
   std::string cartInfo = factory->cartStateDesc();
-  setText( StringHelper::format( 0xff, "%s\n%s", _(workInfo), _( cartInfo ) ) );
+  setText( utils::format( 0xff, "%s\n%s", _(workInfo), _( cartInfo ) ) );
 
   _updateWorkersLabel( Point( 32, 157 ), 542, factory->maximumWorkers(), factory->numberWorkers() );
 }
 
-void AboutFactory::showDescription()
+void AboutFactory::_showHelp()
 {
   DictionaryWindow::show( ui()->rootWidget(), _type );
 }
 
-AboutShipyard::AboutShipyard(Widget* parent, const Tile& tile)
-  : AboutFactory( parent, tile )
+AboutShipyard::AboutShipyard(Widget* parent, PlayerCityPtr city, const Tile& tile)
+  : AboutFactory( parent, city, tile )
 {
   ShipyardPtr shipyard = ptr_cast<Shipyard>( tile.overlay() );
 
@@ -102,8 +123,8 @@ AboutShipyard::AboutShipyard(Widget* parent, const Tile& tile)
 }
 
 
-AboutWharf::AboutWharf(Widget* parent, const Tile& tile)
-  : AboutFactory( parent, tile )
+AboutWharf::AboutWharf(Widget* parent, PlayerCityPtr city, const Tile& tile)
+  : AboutFactory( parent, city, tile )
 {
   WharfPtr wharf = ptr_cast<Wharf>( tile.overlay() );
 

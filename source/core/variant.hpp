@@ -246,6 +246,7 @@ class Variant
     operator bool() const { return toBool(); }
     operator TilePos() const { return toTilePos(); }
     operator Point() const { return toPoint(); }
+    operator PointF() const { return toPointF(); }
 
     static std::string typeToName(Type type);
     static Type nameToType(const std::string& name);
@@ -329,38 +330,6 @@ typename std::vector<T>& operator<<(std::vector<T>& v, const VariantList& vars)
 }
 
 StringArray& operator<<(StringArray& strlist, const VariantList& vars );
-
-class VariantMap : public std::map<std::string, Variant>
-{
-public:
-  VariantMap() {}
-
-  VariantMap( const VariantMap& other )
-  {
-    *this = other;
-  }
-
-  VariantMap& operator=(const VariantMap& other )
-  {
-    for( VariantMap::const_iterator it=other.begin(); it != other.end(); ++it )
-    {
-      (*this)[ it->first ] = it->second;
-    }
-
-    return *this;
-  }
-
-  Variant get( const std::string& name, Variant defaultVal=Variant() ) const
-  {
-    VariantMap::const_iterator it = find( name );
-    return (it != end() ? it->second : defaultVal );
-  }
-
-  Variant toVariant() const
-  {
-    return Variant( *this );
-  }
-};
 
 inline Variant::Variant() {}
 

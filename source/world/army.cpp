@@ -24,7 +24,7 @@
 #include "empiremap.hpp"
 #include "gfx/tilesarray.hpp"
 #include "game/resourcegroup.hpp"
-#include <map>
+#include "core/variant_map.hpp"
 
 using namespace gfx;
 
@@ -48,7 +48,7 @@ Army::Army( EmpirePtr empire )
 
   _animation().load( ResourceGroup::empirebits, 37, 16 );
   _animation().setLoop( Animation::loopAnimation );
-  Size size = _animation().getFrame( 0 ).size();
+  Size size = _animation().frame( 0 ).size();
   _animation().setOffset( Point( -size.width() / 2, size.height() / 2 ) );
   d->strength = 0;
 }
@@ -128,14 +128,12 @@ void Army::attack(ObjectPtr obj)
     d->destination = obj->name();
     _findWay( d->base->location(), obj->location() );
 
-    if( !_way().empty() )
-    {
-      empire()->addObject( this );
-    }
-    else
+    if( _way().empty() )
     {
       Logger::warning( "Army: cannot find way from %s to %s", d->base->name().c_str(), obj->name().c_str() );
     }
+
+    attach();
   }
   else
   {
@@ -153,7 +151,76 @@ void Army::setStrength(int value)
   }
 }
 
-
 int Army::strength() const { return _dfunc()->strength; }
+void Army::killSoldiers(int percent)
+{
+  _dfunc()->strength = _dfunc()->strength * percent / 100;
+}
+
+void Army::addObject(ObjectPtr obj )
+{
+  MovableObject::addObject( obj );
+
+  ArmyPtr otherArmy = ptr_cast<Army>( obj );
+  if( otherArmy.isValid() && _isAgressiveArmy( otherArmy ) )
+  {
+    int attackersLoss = 0;
+    int selfLoss = 0;
+
+    Army::battle( otherArmy->strength(), strength(), attackersLoss, selfLoss );
+
+    otherArmy->killSoldiers(attackersLoss);
+    killSoldiers(selfLoss);
+    }
+}
+
+std::string Army::target() const { return _dfunc()->destination; }
+
+void Army::battle(unsigned int attackers, unsigned int defenders, int& attackersLoss, int& deffLoss )
+{
+  int delimArmy2self = math::percentage( attackers, defenders );
+  attackersLoss = 0;
+  deffLoss = 0;
+
+  if( delimArmy2self < 25 )
+  {
+    attackersLoss = 100;
+    deffLoss = math::random( 10 );
+  }
+  else if( delimArmy2self <= 100 )
+  {
+    int minAtLoss = 100 - delimArmy2self;
+    int randomAtLoss = math::random(100+delimArmy2self);
+    attackersLoss = math::clamp<int>( randomAtLoss, minAtLoss, 100 );
+
+    int minSelfLoss = math::random( attackersLoss );
+    int randomSelfLoss = math::random( attackersLoss + delimArmy2self );
+    deffLoss = math::clamp<int>( randomSelfLoss, minSelfLoss, 100 );
+  }
+  else if( delimArmy2self < 400 )
+  {
+     int minb=0;
+     int pctAdvantage = math::percentage( attackers - defenders, attackers );
+     if (pctAdvantage < 10) {  minb = 70; }
+     else if (pctAdvantage < 50) { minb = 50; }
+     else if (pctAdvantage < 100) { minb = 40; }
+     else if (pctAdvantage < 150) { minb = 30; }
+     else if (pctAdvantage < 300) { minb = 20; }
+     else { minb = 15; }
+
+     attackersLoss = math::clamp<int>( math::random( 100 ), 0, minb );
+     deffLoss = math::clamp<int>( math::random( 100 ), 100 - minb, 100 );
+  }
+  else
+  {
+    attackersLoss = math::random( 10 );
+    deffLoss = 100;
+    }
+}
+
+bool Army::_isAgressiveArmy(ArmyPtr) const
+{
+  return true;
+}
 
 }

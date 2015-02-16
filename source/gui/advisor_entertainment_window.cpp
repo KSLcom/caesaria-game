@@ -21,7 +21,7 @@
 #include "texturedbutton.hpp"
 #include "label.hpp"
 #include "game/resourcegroup.hpp"
-#include "core/stringhelper.hpp"
+#include "core/utils.hpp"
 #include "objects/construction.hpp"
 #include "gfx/engine.hpp"
 #include "core/gettext.hpp"
@@ -82,20 +82,20 @@ public:
     std::string buildingStr, peoplesStr;
     switch( _service )
     {
-    case building::theater: buildingStr = _("##theaters##"); peoplesStr = _("##peoples##"); break;
-    case building::amphitheater: buildingStr = _("##amphitheatres##"); peoplesStr = _("##peoples##"); break;
-    case building::colloseum: buildingStr = _("##colloseum##"); peoplesStr = _("##peoples##"); break;
-    case building::hippodrome: buildingStr = _("##hippodromes##"); peoplesStr = "-"; break;
+    case objects::theater: buildingStr = _("##theaters##"); peoplesStr = _("##peoples##"); break;
+    case objects::amphitheater: buildingStr = _("##amphitheatres##"); peoplesStr = _("##peoples##"); break;
+    case objects::colloseum: buildingStr = _("##colloseum##"); peoplesStr = _("##peoples##"); break;
+    case objects::hippodrome: buildingStr = _("##hippodromes##"); peoplesStr = "-"; break;
     default:
     break;
     }
 
     PictureRef& texture = _textPictureRef();
     Font rfont = font();
-    rfont.draw( *texture, StringHelper::format( 0xff, "%d %s", _info.buildingCount, buildingStr.c_str() ), 0, 0 );
-    rfont.draw( *texture, StringHelper::format( 0xff, "%d", _info.buildingWork ), 165, 0 );
-    rfont.draw( *texture, StringHelper::format( 0xff, "%d", _info.buildingShow ), 245, 0 );
-    rfont.draw( *texture, StringHelper::format( 0xff, "%d %s", _info.peoplesServed, peoplesStr.c_str() ), 305, 0 );
+    rfont.draw( *texture, utils::format( 0xff, "%d %s", _info.buildingCount, buildingStr.c_str() ), 0, 0 );
+    rfont.draw( *texture, utils::format( 0xff, "%d", _info.buildingWork ), 165, 0 );
+    rfont.draw( *texture, utils::format( 0xff, "%d", _info.buildingShow ), 245, 0 );
+    rfont.draw( *texture, utils::format( 0xff, "%d %s", _info.peoplesServed, peoplesStr.c_str() ), 305, 0 );
   }
 
 private:
@@ -119,9 +119,9 @@ public:
   TexturedButton* btnHelp;
   Label* lbMonthFromLastFestival;
   city::FestivalPtr srvc;
+  int monthFromLastFestival;
 
-  InfrastructureInfo getInfo( PlayerCityPtr city, const TileOverlay::Type service );
-  void assignFestival(int divinityType, int festSize);
+  InfrastructureInfo getInfo(const TileOverlay::Type service );
   void updateInfo();
   void updateFestivalInfo();
 };
@@ -133,9 +133,17 @@ Entertainment::Entertainment(PlayerCityPtr city, Widget* parent, int id )
   _d->city = city;
   _d->srvc << city->findService( city::Festival::defaultName() );
 
+  if( _d->srvc.isNull() )
+  {
+    Logger::warning( "WARNING!!!: city have no entertainment service" );
+    return;
+  }
+
   setupUI( ":/gui/entertainmentadv.gui" );
 
   setPosition( Point( (parent->width() - width() )/2, parent->height() / 2 - 242 ) );
+
+  _d->monthFromLastFestival = _d->srvc->lastFestivalDate().monthsTo( game::Date::current() );
 
   GET_DWIDGET_FROM_UI( _d, lbBlackframe )
   GET_DWIDGET_FROM_UI( _d, lbTroubleInfo )
@@ -147,17 +155,17 @@ Entertainment::Entertainment(PlayerCityPtr city, Widget* parent, int id )
   Point startPoint( 2, 2 );
   Size labelSize( 550, 20 );
   InfrastructureInfo info;
-  info = _d->getInfo( city, building::theater );
-  _d->lbTheatresInfo = new EntertainmentInfoLabel( _d->lbBlackframe, Rect( startPoint, labelSize ), building::theater, info );
+  info = _d->getInfo( objects::theater );
+  _d->lbTheatresInfo = new EntertainmentInfoLabel( _d->lbBlackframe, Rect( startPoint, labelSize ), objects::theater, info );
 
-  info = _d->getInfo( city, building::amphitheater );
-  _d->lbAmphitheatresInfo = new EntertainmentInfoLabel( _d->lbBlackframe, Rect( startPoint + Point( 0, 20), labelSize), building::amphitheater,
+  info = _d->getInfo( objects::amphitheater );
+  _d->lbAmphitheatresInfo = new EntertainmentInfoLabel( _d->lbBlackframe, Rect( startPoint + Point( 0, 20), labelSize), objects::amphitheater,
                                                         info );
-  info = _d->getInfo( city, building::colloseum );
-  _d->lbColisseumInfo = new EntertainmentInfoLabel( _d->lbBlackframe, Rect( startPoint + Point( 0, 40), labelSize), building::colloseum, info );
+  info = _d->getInfo( objects::colloseum );
+  _d->lbColisseumInfo = new EntertainmentInfoLabel( _d->lbBlackframe, Rect( startPoint + Point( 0, 40), labelSize), objects::colloseum, info );
 
-  info = _d->getInfo( city, building::hippodrome );
-  _d->lbHippodromeInfo = new EntertainmentInfoLabel( _d->lbBlackframe, Rect( startPoint + Point( 0, 60), labelSize), building::hippodrome, info );
+  info = _d->getInfo( objects::hippodrome );
+  _d->lbHippodromeInfo = new EntertainmentInfoLabel( _d->lbBlackframe, Rect( startPoint + Point( 0, 60), labelSize), objects::hippodrome, info );
 
   CONNECT( _d->btnNewFestival, onClicked(), this, Entertainment::_showFestivalWindow );
 
@@ -175,11 +183,11 @@ void Entertainment::draw( Engine& painter )
 
 void Entertainment::_showFestivalWindow()
 {
-  FestivalPlaningWindow* wnd = FestivalPlaningWindow::create( this, _d->city, -1 );
-  CONNECT( wnd, onFestivalAssign(), _d.data(), Impl::assignFestival );
+  dialog::FestivalPlaning* wnd = dialog::FestivalPlaning::create( this, _d->city, -1 );
+  CONNECT( wnd, onFestivalAssign(), this, Entertainment::_assignFestival );
 }
 
-InfrastructureInfo Entertainment::Impl::getInfo(PlayerCityPtr city, const TileOverlay::Type service)
+InfrastructureInfo Entertainment::Impl::getInfo( const TileOverlay::Type service)
 {
   city::Helper helper( city );
 
@@ -202,9 +210,9 @@ InfrastructureInfo Entertainment::Impl::getInfo(PlayerCityPtr city, const TileOv
       int maxServing = 0;
       switch( service )
       {
-      case building::theater: maxServing = 500; break;
-      case building::amphitheater: maxServing = 800; break;
-      case building::colloseum: maxServing = 1500; break;
+      case objects::theater: maxServing = 500; break;
+      case objects::amphitheater: maxServing = 800; break;
+      case objects::colloseum: maxServing = 1500; break;
       default:
       break;
       }
@@ -218,12 +226,12 @@ InfrastructureInfo Entertainment::Impl::getInfo(PlayerCityPtr city, const TileOv
   return ret;
 }
 
-void Entertainment::Impl::assignFestival(int divinityType, int festSize)
+void Entertainment::_assignFestival( int divinityType, int festSize)
 {
-  if( srvc.isValid() )
+  if( _d->srvc.isValid() )
   {
-    srvc->assignFestival( (religion::RomeDivinityType)divinityType, festSize );
-    updateFestivalInfo();
+    _d->srvc->assignFestival( (religion::RomeDivinityType)divinityType, festSize );
+    _d->updateFestivalInfo();
   }
 }
 
@@ -247,7 +255,7 @@ void Entertainment::Impl::updateInfo()
   int nextLevelColloseum = 0;
   int maxHouseLevel = 0;
 
-  HouseList houses = helper.find<House>( building::house );
+  HouseList houses = helper.find<House>( objects::house );
   foreach( it, houses )
   {
     HousePtr house = *it;
@@ -303,16 +311,19 @@ void Entertainment::Impl::updateInfo()
 
   int entertCoverage = math::percentage( allServed, allNeed);
 
-  if( entertCoverage > 80 && entertCoverage <= 100 )     { troubles << "##entertainment_80_100##"; }
+  if( hpdNeed > hpdServed ) { troubles << "##citizens_here_are_bored_for_chariot_races##"; }
+
+  if( entertCoverage > 80 && entertCoverage <= 100 )     { troubles << "##citizens_like_chariot_races##"; }
   else if( entertCoverage > 50 && entertCoverage <= 80 ) { troubles << "##entertainment_50_80##"; }
   else if( allNeed > 0 && entertCoverage <= 50 )         { troubles << "##entertainment_less_50##"; }
 
   if( minTheaterSrvc < 30 )   { troubles << "##some_houses_inadequate_entertainment##"; }
   if( thInfo.partlyWork > 0 ) { troubles << "##some_theaters_need_actors##"; }
   if( amthInfo.partlyWork > 0){ troubles << "##some_amphitheaters_no_actors##"; }
+  if( amthInfo.buildingCount == 0 ) { troubles << "##blood_sports_add_spice_to_life##"; }
   if( clsInfo.partlyWork > 0 ){ troubles << "##small_colloseum_show##"; }
 
-  HippodromeList hippodromes = helper.find<Hippodrome>( building::hippodrome );
+  HippodromeList hippodromes = helper.find<Hippodrome>( objects::hippodrome );
   foreach( h, hippodromes )
   {
     if( (*h)->evaluateTrainee( walker::charioteer ) == 100 ) { troubles << "##no_chariots##"; }
@@ -322,44 +333,42 @@ void Entertainment::Impl::updateInfo()
   if( nextLevelAmph > 0 ) { troubles << "##some_houses_need_amph_for_grow##"; }
   if( theatersNeed == 0 ) { troubles << "##entertainment_not_need##";  }
 
-  std::string text;
-
   if( troubles.empty() )
   {
-    if( maxHouseLevel < HouseLevel::bigDomus ) { text = "##entadv_small_city_not_need_entert##"; }
-    else if( maxHouseLevel < HouseLevel::mansion ) { text = "##small_city_not_need_entertainment##"; }
-    else if( maxHouseLevel < HouseLevel::insula ) { text = "##etertadv_as_city_grow_you_need_more_entert##"; }
-    else { text = "##entertainment_full##"; }
-  }
-  else
-  {
-    text = troubles.random();
+    if( maxHouseLevel < HouseLevel::bigDomus ) { troubles << "##entadv_small_city_not_need_entert##"; }
+    else if( maxHouseLevel < HouseLevel::mansion ) { troubles << "##small_city_not_need_entertainment##"; }
+    else if( maxHouseLevel < HouseLevel::insula ) { troubles << "##etertadv_as_city_grow_you_need_more_entert##"; }
+
+    if( thInfo.buildingCount > 0 ) { troubles << "##citizens_enjoy_drama_and_comedy##"; }
+
+    troubles << "##entertainment_full##";
   }
 
-  lbTroubleInfo->setText( _( text ) );
+  lbTroubleInfo->setText( _( troubles.random() ) );
 }
 
 void Entertainment::Impl::updateFestivalInfo()
 {
   if( srvc.isValid() )
-  {
-    int monthFromLastFestival = srvc->lastFestivalDate().monthsTo( GameDate::current() );
-    std::string text = StringHelper::format( 0xff, "%d %s", monthFromLastFestival, _("##month_from_last_festival##") );
+  {    
+    std::string text = utils::format( 0xff, "%d %s", monthFromLastFestival, _("##month_from_last_festival##") );
 
     if( lbMonthFromLastFestival ) { lbMonthFromLastFestival->setText( text ); }
 
-    bool prepare2Festival = srvc->nextFestivalDate() >= GameDate::current();
+    bool prepare2Festival = srvc->nextFestivalDate() >= game::Date::current();
     btnNewFestival->setText( prepare2Festival ? _("##prepare_to_festival##") : _("##new_festival##") );
     btnNewFestival->setEnabled( !prepare2Festival );
 
-    int strIndex[24] = { 0, 4, 4, 4,
+    int strIndex[32] = { 0, 4, 4, 4,
                          4, 4, 4, 8,
                          8, 8, 8, 12,
                          12, 12, 12, 12,
                          12, 16, 16, 16,
-                         16, 16, 16, 24 };
+                         16, 16, 16, 24,
+                         24, 24, 24, 24,
+                         24, 24, 31, 31 };
 
-    text = StringHelper::format( 0xff, "##more_%d_month_from_festival##", strIndex[ math::clamp( monthFromLastFestival, 0, 23) ] );
+    text = utils::format( 0xff, "##more_%d_month_from_festival##", strIndex[ math::clamp( monthFromLastFestival, 0, 32) ] );
     if( lbInfoAboutLastFestival ) { lbInfoAboutLastFestival->setText( _( text ) ); }
   }
 }

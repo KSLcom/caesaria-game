@@ -31,9 +31,12 @@ using namespace constants;
 namespace gfx
 {
 
-int LayerTax::type() const {  return citylayer::tax; }
+namespace layer
+{
 
-void LayerTax::drawTile(Engine& engine, Tile& tile, const Point& offset)
+int Tax::type() const {  return citylayer::tax; }
+
+void Tax::drawTile(Engine& engine, Tile& tile, const Point& offset)
 {
   Point screenPos = tile.mappos() + offset;
 
@@ -48,57 +51,34 @@ void LayerTax::drawTile(Engine& engine, Tile& tile, const Point& offset)
     TileOverlayPtr overlay = tile.overlay();
 
     int taxLevel = -1;
-    switch( overlay->type() )
+    if( _isVisibleObject( overlay->type() ) )
     {
     // Base set of visible objects
-    case construction::road:
-    case construction::plaza:
-    case construction::garden:
-
-    case building::burnedRuins:
-    case building::collapsedRuins:
-
-    case building::lowBridge:
-    case building::highBridge:
-
-    case building::elevation:
-    case building::rift:
-
-    // Tax-related
-    case building::senate:
-    case building::forum:
       needDrawAnimations = true;
-    break;
+    }
+    else if( overlay->type() == objects::house )
+    {
+      HousePtr house = ptr_cast<House>( overlay );
+      //taxLevel = house->getServiceValue( Service::forum );
+      taxLevel = math::clamp<int>( house->taxesThisYear(), 0, 100 );
+      needDrawAnimations = (house->spec().level() == 1) && (house->habitants().empty());
 
-      //houses
-    case building::house:
+      if( needDrawAnimations  )
       {
-        HousePtr house = ptr_cast<House>( overlay );
-        //taxLevel = house->getServiceValue( Service::forum );
-        taxLevel = math::clamp<int>( house->taxesThisYear(), 0, 100 );
-        needDrawAnimations = (house->spec().level() == 1) && (house->habitants().empty());
-
-        if( needDrawAnimations  )
-        {
-          int taxAccess = house->hasServiceAccess( Service::forum );
-          needDrawAnimations = (taxAccess < 25);
-        }
-
-        if( !needDrawAnimations )
-        {
-          city::Helper helper( _city() );
-          drawArea( engine, helper.getArea( overlay ), offset, ResourceGroup::foodOverlay, OverlayPic::inHouseBase );
-        }
+        int taxAccess = house->hasServiceAccess( Service::forum );
+        needDrawAnimations = (taxAccess < 25);
       }
-    break;
 
-      //other buildings
-    default:
+      if( !needDrawAnimations )
       {
         city::Helper helper( _city() );
-        drawArea( engine, helper.getArea( overlay ), offset, ResourceGroup::foodOverlay, OverlayPic::base );
+        drawArea( engine, helper.getArea( overlay ), offset, ResourceGroup::foodOverlay, OverlayPic::inHouseBase );
       }
-    break;
+    }
+    else
+    {
+      city::Helper helper( _city() );
+      drawArea( engine, helper.getArea( overlay ), offset, ResourceGroup::foodOverlay, OverlayPic::base );
     }
 
     if( needDrawAnimations )
@@ -108,22 +88,23 @@ void LayerTax::drawTile(Engine& engine, Tile& tile, const Point& offset)
     }
     else if( taxLevel > 0 )
     {
-      drawColumn( engine, screenPos, taxLevel );
+      _addColumn( screenPos, taxLevel );
+      //drawColumn( engine, screenPos, taxLevel );
     }
   }
 
   tile.setWasDrawn();
 }
 
-LayerPtr LayerTax::create( Camera& camera, PlayerCityPtr city )
+LayerPtr Tax::create( Camera& camera, PlayerCityPtr city )
 {
-  LayerPtr ret( new LayerTax( camera, city ) );
+  LayerPtr ret( new Tax( camera, city ) );
   ret->drop();
 
   return ret;
 }
 
-void LayerTax::handleEvent(NEvent& event)
+void Tax::handleEvent(NEvent& event)
 {
   if( event.EventType == sEventMouse )
   {
@@ -135,12 +116,21 @@ void LayerTax::handleEvent(NEvent& event)
       std::string text = "";
       if( tile != 0 )
       {
-        HousePtr house = ptr_cast<House>( tile->overlay() );
-        if( house.isValid() )
+        BuildingPtr bld = ptr_cast<Building>( tile->overlay() );
+
+        if( bld.isNull() )
         {
-          int taxAccess = house->hasServiceAccess( Service::forum );
-          if( taxAccess < 25 )
-            text = "##house_not_registered_for_taxes##";
+          text = "##no_people_in_this_locality##";
+        }
+        else
+        {
+          HousePtr house = ptr_cast<House>( tile->overlay() );
+          if( house.isValid() )
+          {
+            int taxAccess = house->hasServiceAccess( Service::forum );
+            if( taxAccess < 25 )
+              text = "##house_not_registered_for_taxes##";
+          }
         }
       }
 
@@ -155,11 +145,10 @@ void LayerTax::handleEvent(NEvent& event)
   Layer::handleEvent( event );
 }
 
-LayerTax::LayerTax( Camera& camera, PlayerCityPtr city)
-  : Layer( &camera, city )
+Tax::Tax( Camera& camera, PlayerCityPtr city)
+  : Info( camera, city, 9 )
 {
-  _loadColumnPicture( 9 );
   _addWalkerType( walker::taxCollector );
 }
-
+}
 }//end namespace gfx

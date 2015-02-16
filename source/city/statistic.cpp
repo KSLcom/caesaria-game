@@ -32,6 +32,7 @@
 #include "cityservice_military.hpp"
 #include "core/time.hpp"
 #include "cityservice_health.hpp"
+#include "world/traderoute.hpp"
 #include "core/logger.hpp"
 #include <map>
 
@@ -40,7 +41,10 @@ using namespace constants;
 namespace city
 {
 
-void Statistic::getWorkersNumber(PlayerCityPtr city, int& workersNumber, int& maxWorkers )
+namespace statistic
+{
+
+void getWorkersNumber(PlayerCityPtr city, int& workersNumber, int& maxWorkers )
 {
   WorkingBuildingList buildings;
   buildings << city->overlays();
@@ -54,7 +58,7 @@ void Statistic::getWorkersNumber(PlayerCityPtr city, int& workersNumber, int& ma
   }
 }
 
-float Statistic::getBalanceKoeff(PlayerCityPtr city)
+float getBalanceKoeff(PlayerCityPtr city)
 {
   if( city.isNull() )
   {
@@ -65,10 +69,58 @@ float Statistic::getBalanceKoeff(PlayerCityPtr city)
   return atan( city->population() / 1000.f );
 }
 
-CitizenGroup Statistic::getPopulation(PlayerCityPtr city)
+int getEntertainmentCoverage(PlayerCityPtr city, Service::Type service)
+{
+  int need = 0, have = 0;
+  city::Helper helper( city );
+  HouseList houses = helper.find<House>( objects::house );
+  foreach( it, houses )
+  {
+    HousePtr house = *it;
+    if( house->isEntertainmentNeed( service ) )
+    {
+      int habitants = house->habitants().count();
+      need += habitants;
+      have += (house->hasServiceAccess( service) ? habitants : 0);
+    }
+  }
+
+  return ( have == 0
+            ? 0
+            : math::percentage( need, have) );
+}
+
+bool canImport(PlayerCityPtr city, good::Product type)
+{
+  world::EmpirePtr empire = city->empire();
+  world::TraderouteList routes = empire->tradeRoutes( city->name() );
+  bool haveImportWay = false;
+  foreach( it, routes )
+  {
+    world::CityPtr partner = (*it)->partner( city->name() );
+    const good::Store& goods = partner->exportingGoods();
+    if( goods.capacity( type ) > 0 )
+    {
+      haveImportWay = true;
+      break;
+    }
+  }
+
+  return haveImportWay;
+}
+
+bool canProduce(PlayerCityPtr city, good::Product type)
 {
   Helper helper( city );
-  HouseList houses = helper.find<House>( building::house );
+
+  FactoryList buildings = helper.getProducers<Factory>( type );
+  return !buildings.empty();
+}
+
+CitizenGroup getPopulation(PlayerCityPtr city)
+{
+  Helper helper( city );
+  HouseList houses = helper.find<House>( objects::house );
 
   CitizenGroup ret;
   foreach( it, houses ) { ret += (*it)->habitants(); }
@@ -76,17 +128,17 @@ CitizenGroup Statistic::getPopulation(PlayerCityPtr city)
   return ret;
 }
 
-unsigned int Statistic::getWorkersNeed(PlayerCityPtr city)
+unsigned int getWorkersNeed(PlayerCityPtr city)
 {
   int have, need;
   getWorkersNumber( city, have, need );
   return need < have ? 0 : need - have;
 }
 
-unsigned int Statistic::getAvailableWorkersNumber(PlayerCityPtr city)
+unsigned int getAvailableWorkersNumber(PlayerCityPtr city)
 {
   Helper helper( city );
-  HouseList houses = helper.find<House>( building::house );
+  HouseList houses = helper.find<House>( objects::house );
 
   int workersNumber = 0;
   foreach( h, houses )
@@ -97,7 +149,7 @@ unsigned int Statistic::getAvailableWorkersNumber(PlayerCityPtr city)
   return workersNumber;
 }
 
-unsigned int Statistic::getMonthlyWorkersWages(PlayerCityPtr city)
+unsigned int getMonthlyWorkersWages(PlayerCityPtr city)
 {
   int workersNumber, maxWorkers;
   getWorkersNumber( city, workersNumber, maxWorkers );
@@ -114,16 +166,16 @@ unsigned int Statistic::getMonthlyWorkersWages(PlayerCityPtr city)
   return wages;
 }
 
-float Statistic::getMonthlyOneWorkerWages(PlayerCityPtr city)
+float getMonthlyOneWorkerWages(PlayerCityPtr city)
 {
   return city->funds().workerSalary() / (10.f * DateTime::monthsInYear);
 }
 
-unsigned int Statistic::getWorklessNumber(PlayerCityPtr city)
+unsigned int getWorklessNumber(PlayerCityPtr city)
 {
   Helper helper( city );
 
-  HouseList houses = helper.find<House>( building::house );
+  HouseList houses = helper.find<House>( objects::house );
 
   int worklessNumber = 0;
   foreach( h, houses ) { worklessNumber += (*h)->getServiceValue( Service::recruter ); }
@@ -131,12 +183,12 @@ unsigned int Statistic::getWorklessNumber(PlayerCityPtr city)
   return worklessNumber;
 }
 
-unsigned int Statistic::getWorklessPercent(PlayerCityPtr city)
+unsigned int getWorklessPercent(PlayerCityPtr city)
 {
   return math::percentage( getWorklessNumber( city ), getAvailableWorkersNumber( city ) );
 }
 
-unsigned int Statistic::getCrimeLevel( PlayerCityPtr city )
+unsigned int getCrimeLevel( PlayerCityPtr city )
 {
   DisorderPtr ds;
   ds << city->findService( Disorder::defaultName() );
@@ -144,46 +196,46 @@ unsigned int Statistic::getCrimeLevel( PlayerCityPtr city )
   return ds.isValid() ? ds->value() : 0;
 }
 
-unsigned int Statistic::getFoodStock(PlayerCityPtr city)
+unsigned int getFoodStock(PlayerCityPtr city)
 {
   Helper helper( city );
 
   int foodSum = 0;
 
-  GranaryList granaries = helper.find<Granary>( building::granary );
+  GranaryList granaries = helper.find<Granary>( objects::granery );
   foreach( gr, granaries ) { foodSum += (*gr)->store().qty(); }
 
   return foodSum;
 }
 
-unsigned int Statistic::getFoodMonthlyConsumption(PlayerCityPtr city)
+unsigned int getFoodMonthlyConsumption(PlayerCityPtr city)
 {
   Helper helper( city );
 
   int foodComsumption = 0;
-  HouseList houses = helper.find<House>( building::house );
+  HouseList houses = helper.find<House>( objects::house );
 
   foreach( h, houses ) { foodComsumption += (*h)->spec().computeMonthlyFoodConsumption( *h ); }
 
   return foodComsumption;
 }
 
-unsigned int Statistic::getFoodProducing(PlayerCityPtr city)
+unsigned int getFoodProducing(PlayerCityPtr city)
 {
   Helper helper( city );
 
   int foodProducing = 0;
-  FarmList farms = helper.find<Farm>( building::foodGroup );
+  FarmList farms = helper.find<Farm>( objects::foodGroup );
 
-  foreach( f, farms ) { foodProducing += (*f)->getProduceQty(); }
+  foreach( f, farms ) { foodProducing += (*f)->produceQty(); }
 
   return foodProducing;
 }
 
-unsigned int Statistic::getTaxValue(PlayerCityPtr city)
+unsigned int getTaxValue(PlayerCityPtr city)
 {
   Helper helper( city );
-  HouseList houses = helper.find<House>( building::house );
+  HouseList houses = helper.find<House>( objects::house );
 
   float taxValue = 0.f;
   float taxRate = city->funds().taxRate();
@@ -201,10 +253,10 @@ unsigned int Statistic::getTaxValue(PlayerCityPtr city)
   return taxValue;
 }
 
-unsigned int Statistic::getTaxPayersPercent(PlayerCityPtr city)
+unsigned int getTaxPayersPercent(PlayerCityPtr city)
 {
   Helper helper( city );
-  HouseList houses = helper.find<House>( building::house );
+  HouseList houses = helper.find<House>( objects::house );
 
   unsigned int registered = 0;
   unsigned int population = 0;
@@ -221,26 +273,26 @@ unsigned int Statistic::getTaxPayersPercent(PlayerCityPtr city)
   return math::percentage( registered, population );
 }
 
-unsigned int Statistic::getHealth(PlayerCityPtr city)
+unsigned int getHealth(PlayerCityPtr city)
 {
   HealthCarePtr hc;
   hc << city->findService( HealthCare::defaultName() );
   return hc.isValid() ? hc->value() : 0;
 }
 
-int Statistic::months2lastAttack(PlayerCityPtr city)
+int months2lastAttack(PlayerCityPtr city)
 {
   MilitaryPtr ml;
   ml << city->findService( Military::defaultName() );
   return ml.isValid() ? ml->monthFromLastAttack() : 0;
 }
 
-int Statistic::getWagesDiff(PlayerCityPtr city)
+int getWagesDiff(PlayerCityPtr city)
 {
   return city->funds().workerSalary() - city->empire()->workerSalary();
 }
 
-unsigned int Statistic::getFestivalCost(PlayerCityPtr city, FestivalType type)
+unsigned int getFestivalCost(PlayerCityPtr city, FestivalType type)
 {
   switch( type )
   {
@@ -252,12 +304,12 @@ unsigned int Statistic::getFestivalCost(PlayerCityPtr city, FestivalType type)
   return 0;
 }
 
-HouseList Statistic::getEvolveHouseReadyBy(PlayerCityPtr city, const std::set<int>& checkTypes )
+HouseList getEvolveHouseReadyBy(PlayerCityPtr city, const std::set<int>& checkTypes )
 {
   HouseList ret;
 
   Helper helper( city );
-  HouseList houses = helper.find<House>( building::house );
+  HouseList houses = helper.find<House>( objects::house );
 
   foreach( it, houses )
   {
@@ -272,22 +324,38 @@ HouseList Statistic::getEvolveHouseReadyBy(PlayerCityPtr city, const std::set<in
   return ret;
 }
 
-Statistic::GoodsMap Statistic::getGoodsMap(PlayerCityPtr city)
+GoodsMap getGoodsMap(PlayerCityPtr city, bool includeGranary)
 {
-  Helper helper( city );
   GoodsMap cityGoodsAvailable;
 
-  WarehouseList warehouses = helper.find<Warehouse>( building::warehouse );
+  WarehouseList warehouses;
+  warehouses << city->overlays();
+
   foreach( wh, warehouses )
   {
-    for( int i=Good::wheat; i < Good::goodCount; i++ )
+    for( good::Product goodType=good::wheat; goodType < good::goodCount; ++goodType )
     {
-      Good::Type goodType = (Good::Type)i;
       cityGoodsAvailable[ goodType ] += (*wh)->store().qty( goodType );
+    }
+  }
+
+  if( includeGranary )
+  {
+    GranaryList granaries;
+    granaries << city->overlays();
+
+    foreach( gg, granaries )
+    {
+      for( good::Product goodType=good::wheat; goodType <= good::vegetable; ++goodType )
+      {
+        cityGoodsAvailable[ goodType ] += (*gg)->store().qty( goodType );
+      }
     }
   }
 
   return cityGoodsAvailable;
 }
+
+}//end namespace statistic
 
 }//end namespace city

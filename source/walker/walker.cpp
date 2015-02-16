@@ -22,14 +22,15 @@
 #include "objects/metadata.hpp"
 #include "core/exception.hpp"
 #include "core/position.hpp"
-#include "core/variant.hpp"
-#include "core/stringhelper.hpp"
+#include "core/variant_map.hpp"
+#include "core/utils.hpp"
 #include "pathway/path_finding.hpp"
 #include "city/city.hpp"
 #include "gfx/animation_bank.hpp"
 #include "gfx/tilemap.hpp"
 #include "core/logger.hpp"
 #include "thinks.hpp"
+#include "gfx/helper.hpp"
 #include "ability.hpp"
 #include "helper.hpp"
 #include "core/foreach.hpp"
@@ -39,8 +40,7 @@ using namespace constants;
 using namespace gfx;
 
 namespace {
-CAESARIA_LITERALCONST(speed)
-CAESARIA_LITERALCONST(speedMultiplier)
+static const Tile invalidTile( TilePos(-1,-1) );
 }
 
 class Walker::Impl
@@ -51,8 +51,8 @@ public:
   walker::Type type;
   bool isDeleted;
   float speed;
-  TilePos pos;
-  UniqueId uid;
+  Tile* location;
+  Walker::UniqueId uid;
   int waitInterval;
   float speedMultiplier;
   Animation animation;  // current animation
@@ -68,6 +68,7 @@ public:
   std::string thinks;
   float tileSpeedKoeff;
   AbilityList abilities;
+  world::Nation nation;
 
   float finalSpeed() const   {  return speedMultiplier * speed * tileSpeedKoeff;  }
 
@@ -85,6 +86,7 @@ Walker::Walker(PlayerCityPtr city) : _d( new Impl )
   _d->action.direction = constants::noneDirection;
   _d->type = walker::unknown;
   _d->health = 100;
+  _d->location = 0;
   _d->lastCenterDst = 99.f;
   _d->centerReached = false;
   _d->speed = 1.f; // default speed
@@ -92,12 +94,19 @@ Walker::Walker(PlayerCityPtr city) : _d( new Impl )
   _d->isDeleted = false;
   _d->centerReached = false;
   _d->waitInterval = 0;
+  _d->nation = world::unknownNation;
 
-  setFlag( vividly, true );
+#ifdef DEBUG
+  WalkerDebugQueue::instance().add( this );
+#endif
 }
 
-Walker::~Walker() {}
-walker::Type Walker::type() const{ return _d->type; }
+Walker::~Walker()
+{
+#ifdef DEBUG
+  WalkerDebugQueue::instance().rem( this );
+#endif
+}
 
 void Walker::timeStep(const unsigned long time)
 {
@@ -144,10 +153,10 @@ void Walker::timeStep(const unsigned long time)
 
 void Walker::setPos( const TilePos& pos )
 {
-  _d->pos = pos;
-  //_d->tileOffset = _d->midTilePos;
-  const Tile& tile =_d->city->tilemap().at( pos );
-  _d->wpos = tile.center().toPointF();
+  _d->location = &_d->city->tilemap().at( pos );
+  _d->wpos = _d->location->center().toPointF();
+
+  _computeDirection();
 }
 
 void Walker::setPathway( const Pathway& pathway)
@@ -160,6 +169,7 @@ void Walker::setPathway( const Pathway& pathway)
 
 void Walker::setSpeed(const float speed){   _d->speed = speed;}
 float Walker::speed() const{ return _d->speed;}
+float Walker::speedMultiplier() const { return _d->speedMultiplier; }
 void Walker::setSpeedMultiplier(float koeff) { _d->speedMultiplier = koeff; }
 
 void Walker::_walk()
@@ -202,11 +212,12 @@ void Walker::_walk()
   delta.ry() = delta.y() * _d->finalSpeed() * speedKoeff;
 
   PointF tmp = _d->wpos;
-  TilePos saveMpos( tmp.x() / 15, tmp.y() / 15 );
+  const int wcell = tilemap::cellSize().height();
+  TilePos saveMpos( tmp.x() / wcell , tmp.y() / wcell );
   _d->wpos += delta;
 
   tmp = _d->wpos;
-  TilePos Mpos( tmp.x() / 15, tmp.y() / 15 );
+  TilePos Mpos( tmp.x() / wcell, tmp.y() / wcell );
 
   if( !_d->centerReached  )
   {
@@ -224,16 +235,14 @@ void Walker::_walk()
 
   if( saveMpos != Mpos )
   {
-    _d->pos = Mpos;
+    _d->location = &_d->city->tilemap().at( Mpos );
     _changeTile();
   }
 }
 
 void Walker::_changeTile()
 {
-   Tilemap& tilemap = _d->city->tilemap();
-   Tile& currentTile = tilemap.at( _d->pos );
-   _d->updateSpeedMultiplier( currentTile );
+   _d->updateSpeedMultiplier( *_d->location );
    _d->centerReached = false;
 }
 
@@ -271,7 +280,7 @@ void Walker::_computeDirection()
   _d->action.direction = _d->pathway.direction();
   _d->nextwpos = _nextTile().center().toPointF();
   _d->lastCenterDst = _d->wpos.getDistanceFrom( _d->nextwpos );
-  _d->subSpeed = ( _d->nextwpos - _d->wpos ) / 15.f;
+  _d->subSpeed = ( _d->nextwpos - _d->wpos ) / tilemap::cellSize().height();
 
   if( lastDirection != _d->action.direction )
   {
@@ -300,43 +309,52 @@ const Tile& Walker::_nextTile() const
 
 Point Walker::mappos() const
 {
-  const Tile& tile = _d->city->tilemap().at( pos() );
+  if( !_d->location )
+    return Point( 0, 0 );
+
+  const Tile& tile = *_d->location;
   Point offset;
   if( tile.overlay().isValid() )
       offset = tile.overlay()->offset( tile, tilesubpos() );
 
-  const PointF p = _d->wpos;
+  const PointF& p = _d->wpos;
   return Point( 2*(p.x() + p.y()), p.x() - p.y() ) + offset;
 }
 
-bool Walker::isDeleted() const{   return _d->isDeleted;}
-void Walker::_changeDirection(){  _d->animation = Animation(); } // need to fetch the new animation
 void Walker::_brokePathway( TilePos pos ){}
 void Walker::_noWay(){}
-
 void Walker::_waitFinished() { }
-Direction Walker::direction() const {  return _d->action.direction;}
+
+world::Nation Walker::nation() const{ return _d->nation; }
+void Walker::_setNation(world::Nation nation) { _d->nation = nation; }
+void Walker::_setLocation( Tile* location ){ _d->location = location; }
 Walker::Action Walker::action() const {  return (Walker::Action)_d->action.action;}
+bool Walker::isDeleted() const{   return _d->isDeleted;}
+void Walker::_changeDirection(){  _d->animation = Animation(); } // need to fetch the new animation
+walker::Type Walker::type() const{ return _d->type; }
+Direction Walker::direction() const {  return _d->action.direction;}
 double Walker::health() const{  return _d->health;}
 void Walker::updateHealth(double value) {  _d->health = math::clamp( _d->health + value, -100.0, 100.0 );}
 void Walker::acceptAction(Walker::Action, TilePos){}
 void Walker::setName(const std::string &name) {  _d->name = name; }
 const std::string &Walker::name() const{  return _d->name; }
 void Walker::addAbility(AbilityPtr ability) {  _d->abilities.push_back( ability );}
-TilePos Walker::pos() const{ return _d->pos;}
+TilePos Walker::pos() const{ return _d->location ? _d->location->pos() : TilePos( -1, -1 ) ;}
 void Walker::deleteLater(){ _d->isDeleted = true;}
 void Walker::setUniqueId( const UniqueId uid ) {  _d->uid = uid;}
-UniqueId Walker::uniqueId() const{ return _d->uid; }
+Walker::UniqueId Walker::uniqueId() const { return _d->uid; }
 Pathway& Walker::_pathwayRef() {  return _d->pathway; }
 const Pathway& Walker::pathway() const {  return _d->pathway; }
 Animation& Walker::_animationRef() {  return _d->animation;}
 const Animation& Walker::_animationRef() const {  return _d->animation;}
 void Walker::_setDirection(constants::Direction direction ){  _d->action.direction = direction; }
 void Walker::setThinks(std::string newThinks){  _d->thinks = newThinks;}
+TilePos Walker::places(Walker::Place type) const { return TilePos(-1,-1); }
 void Walker::_setType(walker::Type type){  _d->type = type;}
 PlayerCityPtr Walker::_city() const{  return _d->city;}
 void Walker::_setHealth(double value){  _d->health = value;}
 bool Walker::getFlag(Walker::Flag flag) const{ return _d->flags.count( flag ) > 0; }
+const Tile& Walker::tile() const {  return _d->location ? *_d->location : invalidTile; }
 
 void Walker::setFlag(Walker::Flag flag, bool value)
 {
@@ -346,7 +364,7 @@ void Walker::setFlag(Walker::Flag flag, bool value)
 
 Point Walker::tilesubpos() const
 {
-  Point tmp = Point( _d->pos.i(), _d->pos.j() ) * 15 + Point( 7, 7 );
+  Point tmp = Point( _d->location->i(), _d->location->j() ) * 15 + Point( 7, 7 );
   return tmp - _d->wpos.toPoint();
 }
 
@@ -361,20 +379,40 @@ void Walker::_setAction( Walker::Action action )
 
 void Walker::initialize(const VariantMap &options)
 {
-  _d->speed = options.get( lc_speed, 1.f ); // default speed
-  _d->speedMultiplier = options.get( lc_speedMultiplier, 0.8f + math::random( 40 ) / 100.f );
+  VARIANT_LOAD_ANYDEF_D( _d, speed, 1.f, options )
+
+  float tmpSpeedMultiplier = 0.8f + math::random( 40 ) / 100.f;
+  VARIANT_LOAD_ANYDEF_D( _d, speedMultiplier, tmpSpeedMultiplier, options )
+
+  std::string nation;
+  VARIANT_LOAD_STR( nation, options )
+  if( !nation.empty() )
+  {
+    _d->nation = WalkerHelper::getNation( nation );
+  }
 }
 
 int Walker::agressive() const { return 0; }
 
-std::string Walker::currentThinks() const
+void Walker::attach()
 {
-  if( _d->thinks.empty() )
+  if( _city().isValid() )
+    _city()->addWalker( this );
+}
+
+std::string Walker::thoughts(Thought about) const
+{
+  if( thCurrent )
   {
-    const_cast< Walker* >( this )->_updateThinks( );
+    if( _d->thinks.empty() )
+    {
+      const_cast< Walker* >( this )->_updateThoughts();
+    }
+
+    return _d->thinks;
   }
 
-  return _d->thinks;
+  return "";
 }
 
 void Walker::getPictures(gfx::Pictures& oPics)
@@ -391,8 +429,7 @@ const Picture& Walker::getMainPicture()
     AnimationBank::MovementAnimation::const_iterator itAnimMap;
     if( _d->action.direction == constants::noneDirection )
     {
-      DirectedAction action = { _d->action.action, constants::north };
-      itAnimMap = animMap.find(action);
+      itAnimMap = animMap.find( DirectedAction(_d->action.action, constants::north ) );
     }
     else
     {
@@ -415,71 +452,74 @@ const Picture& Walker::getMainPicture()
 
 void Walker::save( VariantMap& stream ) const
 {
-  stream[ "name" ] = Variant( _d->name );
-  stream[ "type" ] = (int)_d->type;
+  VARIANT_SAVE_STR_D( stream, _d, name )
+  VARIANT_SAVE_ANY_D( stream, _d, type )
+  VARIANT_SAVE_ENUM_D( stream, _d, nation )
   stream[ "pathway" ] =  _d->pathway.save();
-  stream[ "health" ] = _d->health;
-  stream[ "action" ] = (int)_d->action.action;
-  stream[ "direction" ] = (int)_d->action.direction;
-  stream[ "location" ] = _d->pos;
-  stream[ "tileSpdKoeff" ] = _d->tileSpeedKoeff;
-  stream[ "wpos" ] = _d->wpos;
-  stream[ "nextwpos" ] = _d->nextwpos;
-  stream[ lc_speed ] = _d->speed;
-  stream[ lc_speedMultiplier ] = (float)_d->speedMultiplier;
-  stream[ "uid" ] = (unsigned int)_d->uid;
-  stream[ "thinks" ] = Variant( _d->thinks );
-  stream[ "subspeed" ] = _d->subSpeed;
-  stream[ "lastCenterDst" ] = _d->lastCenterDst;
+  VARIANT_SAVE_ANY_D( stream, _d, health )
+  VARIANT_SAVE_ANY_D( stream, _d, isDeleted )
+  VARIANT_SAVE_ANY_D( stream, _d, action.action )
+  VARIANT_SAVE_ANY_D( stream, _d, action.direction )
+  stream[ "location" ] = _d->location->pos();
+  VARIANT_SAVE_ANY_D( stream, _d, tileSpeedKoeff )
+  VARIANT_SAVE_ANY_D( stream, _d, wpos )
+  VARIANT_SAVE_ANY_D( stream, _d, nextwpos )
+  VARIANT_SAVE_ANY_D( stream, _d, speed )
+  VARIANT_SAVE_ANY_D( stream, _d, speedMultiplier )
+  VARIANT_SAVE_ANY_D( stream, _d, uid )
+  VARIANT_SAVE_STR_D( stream, _d, thinks )
+  VARIANT_SAVE_ANY_D( stream, _d, subSpeed )
+  VARIANT_SAVE_ANY_D( stream, _d, lastCenterDst )
+  stream[ "showDebugInfo" ] = getFlag( showDebugInfo );
 }
 
 void Walker::load( const VariantMap& stream)
 {
   Tilemap& tmap = _city()->tilemap();
 
-  _d->name = stream.get( "name" ).toString();
-  _d->wpos = stream.get( "wpos" ).toPointF();
-  _d->pos = stream.get( "location" );
-  _d->lastCenterDst = stream.get( "lastCenterDst" );
-  _d->pathway.init( tmap, tmap.at( 0, 0 ) );
-  _d->pathway.load( stream.get( "pathway" ).toMap() );
-  _d->thinks = stream.get( "thinks" ).toString();
-  _d->tileSpeedKoeff = stream.get( "tileSpdKoeff" );
-  _d->nextwpos = stream.get( "nextwpos" ).toPointF();
-  _d->action.action = (Walker::Action) stream.get( "action" ).toInt();
-  _d->action.direction = (Direction) stream.get( "direction" ).toInt();
-  _d->uid = (UniqueId)stream.get( "uid" ).toInt();
-  _d->subSpeed = stream.get( "subspeed" ).toPointF();
-  _d->speedMultiplier = (float)stream.get( lc_speedMultiplier, 1.f );
+  VARIANT_LOAD_ENUM_D( _d, nation, stream )
+  VARIANT_LOAD_STR_D( _d, name, stream )
+  VARIANT_LOAD_ANY_D( _d, wpos, stream )
+  TilePos pos = stream.get( "location" ).toTilePos();
+  _d->location = &tmap.at( pos );
+  VARIANT_LOAD_ANY_D( _d, lastCenterDst, stream )
+  _d->pathway.load( tmap, stream.get( "pathway" ).toMap() );
+  VARIANT_LOAD_STR_D( _d, thinks, stream )
+  VARIANT_LOAD_ANY_D( _d, tileSpeedKoeff, stream )
+  VARIANT_LOAD_ANY_D( _d, nextwpos, stream );
+  VARIANT_LOAD_ANY_D( _d, isDeleted, stream );
+  VARIANT_LOAD_ENUM_D( _d, action.action, stream )
+  VARIANT_LOAD_ENUM_D( _d, action.direction, stream )
+  VARIANT_LOAD_ENUM_D( _d, uid, stream )
+  VARIANT_LOAD_ANY_D( _d, subSpeed, stream )
+  VARIANT_LOAD_ANY_D( _d, speedMultiplier, stream )
+
 
   if( !_d->pathway.isValid() )
   {
-    Logger::warning( "Walker: wrong way for %s:%s at [%d,%d]",
+    Logger::warning( "WARNING!!! Walker: wrong way for %s:%s at [%d,%d]",
                      WalkerHelper::getTypename( _d->type ).c_str(), _d->name.c_str(),
-                     _d->pos.i(), _d->pos.j() );
+                     _d->location->i(), _d->location->j() );
   }
   
   if( _d->speedMultiplier < 0.1 ) //Sometime this have this error in save file
   {
-    Logger::warning( "Walker: Wrong speed multiplier for %d", _d->uid );
+    Logger::warning( "WARNING!!!! Walker: Wrong speed multiplier for %d", _d->uid );
     _d->speedMultiplier = 1;
   }
 
-  _d->speed = (float)stream.get( lc_speed );
-  _d->health = (double)stream.get( "health" );
+  VARIANT_LOAD_ANY_D( _d, speed, stream )
+  VARIANT_LOAD_ANY_D( _d, health, stream )
+  setFlag( showDebugInfo, stream.get( "showDebugInfo" ).toBool() );
 }
 
-void Walker::turn(TilePos p)
+void Walker::turn(TilePos p )
 {
-  float t = (p - pos()).getAngleICW();
-  int angle = (int)ceil( t / 45.f);
+  Direction direction = tilemap::getDirection( pos(), p );
 
-  Direction directions[] = { east, southEast, south, southWest,
-                             west, northWest, north, northEast, northEast };
-
-  if( _d->action.direction != directions[ angle ] )
+  if( _d->action.direction != direction )
   {
-    _d->action.direction = directions[ angle ];
+    _d->action.direction = direction;
     _animationRef().clear();
   }
 }
@@ -501,7 +541,7 @@ void Walker::_updateAnimation( const unsigned int time )
 
 void Walker::_setWpos( Point pos) { _d->wpos = pos.toPointF(); }
 
-void Walker::_updateThinks()
+void Walker::_updateThoughts()
 {
   _d->thinks = WalkerThinks::check( this, _city() );
 }
@@ -538,3 +578,21 @@ bool Walker::die()
   }
   return corpse.isValid();
 }
+
+#ifdef DEBUG
+void WalkerDebugQueue::print()
+{
+  WalkerDebugQueue& inst = (WalkerDebugQueue&)instance();
+  if( !inst._pointers.empty() )
+  {
+    Logger::warning( "PRINT WALKER DEBUG QUEUE" );
+    foreach( it, inst._pointers )
+    {
+      Walker* wlk = (Walker*)*it;
+      Logger::warning( "%s - %s [%d,%d] ref:%d", wlk->name().c_str(),
+                                          WalkerHelper::getTypename( wlk->type() ).c_str(),
+                                          wlk->pos().i(), wlk->pos().j(), wlk->rcount() );
+    }
+  }
+}
+#endif

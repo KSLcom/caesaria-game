@@ -36,10 +36,12 @@ public:
 
   virtual void draw( gfx::Engine& painter );
 
-oc3_signals public:
+signals public:
   Signal0<>& onEmpireMapRequest();
 
 private:
+  void _showHelp();
+
   class Impl;
   ScopedPtr< Impl > _d;
 };

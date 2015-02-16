@@ -26,6 +26,7 @@
 #include "gfx/picture.hpp"
 #include "objects/service.hpp"
 #include "game/predefinitions.hpp"
+#include "city/city.hpp"
 
 namespace gui
 {
@@ -57,15 +58,16 @@ public:
 
   virtual void setupUI(const VariantMap &ui);
   virtual void setupUI(const vfs::Path& filename);
-  virtual void showDescription() {}
 
 protected:
+  virtual void _showHelp() {}
   gfx::Picture& _background();
   virtual void _afterCreate() {}
   Label* _lbTitleRef();
   Label* _lbTextRef();
   Label* _lbBlackFrameRef();
   PushButton* _btnExitRef();
+
   virtual void _updateWorkersLabel( const Point& pos, int picId, int need, int have );
 
   class Impl;

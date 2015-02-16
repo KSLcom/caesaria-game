@@ -24,21 +24,26 @@
 namespace gui
 {
 
-class CityDonationWindow : public Window
+namespace dialog
+{
+
+class CityDonation : public Window
 {
 public:
-  CityDonationWindow( Widget* parent, int money );
+  CityDonation( Widget* parent, int money );
 
-  virtual ~CityDonationWindow();
+  virtual ~CityDonation();
   virtual bool onEvent(const NEvent &event);
 
-public oc3_signals:
+public signals:
   Signal1<int>& onSendMoney();
 
 private:  
   __DECLARE_IMPL(CityDonationWindow)
 };
 
-} //end namespace gui
+}//end namespace dialog
+
+}//end namespace gui
 
 #endif //_CAESARIA_CITY_DONATION_WINDOW_H_INCLUDE_

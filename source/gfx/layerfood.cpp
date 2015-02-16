@@ -32,9 +32,12 @@ using namespace constants;
 namespace gfx
 {
 
-int LayerFood::type() const {  return citylayer::food; }
+namespace layer
+{
 
-void LayerFood::drawTile(Engine& engine, Tile& tile, const Point& offset)
+int Food::type() const {  return citylayer::food; }
+
+void Food::drawTile(Engine& engine, Tile& tile, const Point& offset)
 {
   Point screenPos = tile.mappos() + offset;
 
@@ -48,49 +51,26 @@ void LayerFood::drawTile(Engine& engine, Tile& tile, const Point& offset)
     bool needDrawAnimations = false;
     TileOverlayPtr overlay = tile.overlay();
     int foodLevel = -1;
-    switch( overlay->type() )
+    if( _isVisibleObject( overlay->type() ) )
     {
-    // Base set of visible objects
-    case construction::road:
-    case construction::plaza:
-    case construction::garden:
-
-    case building::burnedRuins:
-    case building::collapsedRuins:
-
-    case building::lowBridge:
-    case building::highBridge:
-
-    case building::elevation:
-    case building::rift:
-
-    // Food-related
-    case building::market:
-    case building::granary:
+      // Base set of visible objects
       needDrawAnimations = true;     
-    break;
-
-      //houses
-    case building::house:
+    }
+    else if( overlay->type() == objects::house )
+    {
+      city::Helper helper( _city() );
+      HousePtr house = ptr_cast<House>( overlay );
+      foodLevel = (int) house->state( (Construction::Param)House::food );
+      needDrawAnimations = (house->spec().level() == 1) && (house->habitants().empty());
+      if( !needDrawAnimations )
       {
-        city::Helper helper( _city() );        
-        HousePtr house = ptr_cast<House>( overlay );
-        foodLevel = (int) house->state( (Construction::Param)House::food );
-        needDrawAnimations = (house->spec().level() == 1) && (house->habitants().empty());
-        if( !needDrawAnimations )
-        {
-          drawArea( engine, helper.getArea( overlay ), offset, ResourceGroup::foodOverlay, OverlayPic::inHouseBase );
-        }
+        drawArea( engine, helper.getArea( overlay ), offset, ResourceGroup::foodOverlay, OverlayPic::inHouseBase );
       }
-    break;
-
-      //other buildings
-    default:
-      {
-        city::Helper helper( _city() );
-        drawArea( engine, helper.getArea( overlay ), offset, ResourceGroup::foodOverlay, OverlayPic::base);
-      }
-      break;
+    }
+    else      //other buildings
+    {
+      city::Helper helper( _city() );
+      drawArea( engine, helper.getArea( overlay ), offset, ResourceGroup::foodOverlay, OverlayPic::base);
     }
 
     if( needDrawAnimations )
@@ -100,17 +80,17 @@ void LayerFood::drawTile(Engine& engine, Tile& tile, const Point& offset)
     }
     else if( foodLevel >= 0 )
     {
-      drawColumn( engine, screenPos, math::clamp( 100 - foodLevel, 0, 100 ) );
+      _addColumn( screenPos, math::clamp( 100 - foodLevel, 0, 100 ) );
     }
   }
 
   tile.setWasDrawn();
 }
 
-void LayerFood::drawWalkers(Engine &engine, const Tile &tile, const Point &camOffset)
+void Food::drawWalkers(Engine &engine, const Tile &tile, const Point &camOffset)
 {
   Pictures pics;
-  WalkerList walkers = _getVisibleWalkerList( visibleWalkers(), tile.pos() );
+  const WalkerList& walkers = _city()->walkers( tile.pos() );
 
   foreach( w, walkers )
   {
@@ -118,8 +98,8 @@ void LayerFood::drawWalkers(Engine &engine, const Tile &tile, const Point &camOf
     if( wlk->type() == walker::cartPusher )
     {
       CartPusherPtr cartp = ptr_cast<CartPusher>( wlk );
-      Good::Type gtype = cartp->stock().type();
-      if( gtype == Good::none || gtype > Good::vegetable )
+      good::Product gtype = cartp->stock().type();
+      if( gtype == good::none || gtype > good::vegetable )
         continue;
     }
     pics.clear();
@@ -128,7 +108,7 @@ void LayerFood::drawWalkers(Engine &engine, const Tile &tile, const Point &camOf
   }
 }
 
-void LayerFood::handleEvent(NEvent& event)
+void Food::handleEvent(NEvent& event)
 {
   if( event.EventType == sEventMouse )
   {
@@ -147,11 +127,11 @@ void LayerFood::handleEvent(NEvent& event)
 
           if( houseHabitantsCount > 0 )
           {
-            GoodStore& st = house->goodStore();
+            good::Store& st = house->goodStore();
             int foodQty = 0;
-            for( int k=Good::wheat; k <= Good::vegetable; k++ )
+            for( good::Product k=good::wheat; k <= good::vegetable; ++k )
             {
-              foodQty += st.qty( (Good::Type)k );
+              foodQty += st.qty( k );
             }
             int monthWithFood = 2 * foodQty / houseHabitantsCount;
 
@@ -177,24 +157,24 @@ void LayerFood::handleEvent(NEvent& event)
   Layer::handleEvent( event );
 }
 
-LayerPtr LayerFood::create( Camera& camera, PlayerCityPtr city)
+LayerPtr Food::create( Camera& camera, PlayerCityPtr city)
 {
-  LayerPtr ret( new LayerFood( camera, city ) );
+  LayerPtr ret( new Food( camera, city ) );
   ret->drop();
 
   return ret;
 }
 
-LayerFood::LayerFood( Camera& camera, PlayerCityPtr city)
-  : Layer( &camera, city )
+Food::Food( Camera& camera, PlayerCityPtr city)
+  : Info( camera, city, 18 )
 {
-  _loadColumnPicture( 18 );
+  _visibleWalkers() << walker::marketLady << walker::marketKid
+                    << walker::fishingBoat << walker::marketBuyer
+                    << walker::cartPusher;
 
-  _addWalkerType( walker::marketLady );
-  _addWalkerType( walker::marketKid );
-  _addWalkerType( walker::fishingBoat );
-  _addWalkerType( walker::marketBuyer );
-  _addWalkerType( walker::cartPusher );
+  _fillVisibleObjects( type() );
 }
+
+}//
 
 }//end namespace gfx

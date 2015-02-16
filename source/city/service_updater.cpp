@@ -20,6 +20,7 @@
 #include "objects/construction.hpp"
 #include "helper.hpp"
 #include "city.hpp"
+#include "core/variant_map.hpp"
 #include "game/gamedate.hpp"
 #include "objects/house.hpp"
 #include "game/service.hpp"
@@ -49,23 +50,22 @@ public:
 
 SrvcPtr ServiceUpdater::create( PlayerCityPtr city )
 {
-  ServiceUpdater* e = new ServiceUpdater( city );
-
-  SrvcPtr ret( e );
+  SrvcPtr ret( new ServiceUpdater( city ) );
   ret->drop();
 
   return ret;
 }
 
-void ServiceUpdater::update( const unsigned int time)
+void ServiceUpdater::timeStep( const unsigned int time)
 {
-  if( GameDate::isWeekChanged() )
+  if( game::Date::isWeekChanged() )
   {
-    _d->isDeleted = (_d->endTime < GameDate::current());
+    _d->isDeleted = (_d->endTime < game::Date::current());
 
     Logger::warning( "ServiceUpdater: execute service" );
-    Helper helper( &_city );
-    HouseList houses = helper.find<House>( building::house );
+    Helper helper( _city() );
+    HouseList houses = helper.find<House>( objects::house );
+
     foreach( it, houses )
     {
       (*it)->setServiceValue( _d->stype, _d->value );
@@ -94,7 +94,7 @@ VariantMap ServiceUpdater::save() const
 }
 
 ServiceUpdater::ServiceUpdater( PlayerCityPtr city )
-  : Srvc( *city.object(), ServiceUpdater::defaultName() ), _d( new Impl )
+  : Srvc( city, ServiceUpdater::defaultName() ), _d( new Impl )
 {
   _d->isDeleted = false;
   _d->stype = Service::srvCount;

@@ -25,15 +25,19 @@
 namespace gui
 {
 
-class WinMissionWindow : public Window
+namespace dialog
+{
+
+class WinMission : public Window
 {
 public:
-  WinMissionWindow(Widget* parent, const std::string& newTitle,
+  WinMission(Widget* parent, const std::string& newTitle,
                    const std::string& winText,
                    bool mayContinue);
-  virtual ~WinMissionWindow();
+  virtual ~WinMission();
+  virtual bool onEvent(const NEvent &event);
 
-public oc3_signals:
+public signals:
   Signal0<>& onAcceptAssign();
   Signal1<int>& onContinueRules();
 
@@ -41,6 +45,8 @@ private:
   class Impl;
   ScopedPtr<Impl> _d;
 };
+
+}//end namespace dialog
 
 }//end namespace gui
 #endif //_CAESARIA_WINMISSION_WINDOW_H_INCLUDE_

@@ -22,15 +22,18 @@
 #include "house.hpp"
 #include "city/helper.hpp"
 #include "constants.hpp"
+#include "objects_factory.hpp"
 
 using namespace constants;
 using namespace gfx;
 
+REGISTER_CLASS_IN_OVERLAYFACTORY(objects::well, Well)
+
 namespace {
- const unsigned int wellServiceRange = 2;
+const unsigned int wellServiceRange = 2;
 }
 
-Well::Well() : ServiceBuilding( Service::well, building::well, Size(1) )
+Well::Well() : ServiceBuilding( Service::well, objects::well, Size(1) )
 {
   setWorkers( 0 );
 }
@@ -72,11 +75,15 @@ bool Well::isNeedRoadAccess() const {  return false; }
 void Well::burn() { collapse(); }
 bool Well::isDestructible() const{  return true; }
 
-bool Well::build(PlayerCityPtr city, const TilePos &pos)
+bool Well::build( const CityAreaInfo& info )
 {
-  ServiceBuilding::build( city, pos );
+  ServiceBuilding::build( info );
 
-  setPicture( MetaDataHolder::randomPicture( type(), size() ) );
+  Picture rpic = MetaDataHolder::randomPicture( type(), size() );
+  if( !rpic.isValid() )
+    rpic = Picture::load( ResourceGroup::utilitya, 1 );
+
+  setPicture( rpic );
 
   setState( Construction::inflammability, 0 );
   setState( Construction::collapsibility, 0 );

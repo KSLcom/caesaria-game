@@ -30,7 +30,7 @@
 namespace gfx
 {
 
-void Decorator::drawFrame(Picture &dstpic, const Rect& rectangle, const int picId, bool useAlpha )
+/*void Decorator::drawFrame(Picture &dstpic, const Rect& rectangle, const int picId, bool useAlpha )
 {
    // pics are: 0TopLeft, 1Top, 2TopRight, 3Left, 4Center, 5Right, 6BottomLeft, 7Bottom, 8BottomRight
 
@@ -72,7 +72,7 @@ void Decorator::drawFrame(Picture &dstpic, const Rect& rectangle, const int picI
   dstpic.draw(Picture::load( ResourceGroup::panelBackground, picId+6), Point( rectangle.left(), rectangle.bottom() - sh ), useAlpha );
   // bottomRight corner
   dstpic.draw(Picture::load( ResourceGroup::panelBackground, picId+8), rectangle.LowerRightCorner - Point( 16, 16 ), useAlpha );
-}
+}*/
 
 void Decorator::drawFrame(Pictures& stack, const Rect& rectangle, const int picId )
 {
@@ -119,7 +119,7 @@ void Decorator::drawFrame(Pictures& stack, const Rect& rectangle, const int picI
 }
 
 
-void Decorator::drawBorder(Picture &dstpic, const Rect& rectangle, const int offset, bool useAlpha)
+/*void Decorator::drawBorder(Picture &dstpic, const Rect& rectangle, const int offset, bool useAlpha)
 {
   // pics are: 0TopLeft, 1Top, 2TopRight, 3Right, 4BottomRight, 5Bottom, 6BottomLeft, 7Left
   // draws horizontal borders
@@ -150,7 +150,7 @@ void Decorator::drawBorder(Picture &dstpic, const Rect& rectangle, const int off
   dstpic.draw(Picture::load( ResourceGroup::panelBackground, offset+6), rectangle.left(), rectangle.bottom()-sh, useAlpha);
   // bottomRight corner
   dstpic.draw(Picture::load( ResourceGroup::panelBackground, offset+4), rectangle.right()-16, rectangle.bottom()-sh, useAlpha);
-}
+}*/
 
 void Decorator::drawBorder(Pictures& stack, const Rect& rectangle, const int offset)
 {
@@ -215,7 +215,7 @@ void Decorator::drawPanel( Pictures& stack, const Rect& rectangle, int picId )
              rectangle.UpperLeftCorner + Point( rectangle.width()-16, 0) );
 }
 
-void Decorator::drawPanel( Picture &dstpic, const Rect& rectangle, int picId, bool useAlpha )
+/*void Decorator::drawPanel( Picture &dstpic, const Rect& rectangle, int picId, bool useAlpha )
 {
   // left side
   dstpic.draw( Picture::load( ResourceGroup::panelBackground, picId), rectangle.UpperLeftCorner );
@@ -230,7 +230,7 @@ void Decorator::drawPanel( Picture &dstpic, const Rect& rectangle, int picId, bo
   // right side
   dstpic.draw( Picture::load( ResourceGroup::panelBackground, picId+2), 
                rectangle.UpperLeftCorner + Point( rectangle.width()-16, 0) );
-}
+}*/
 
 void Decorator::draw( Picture& dstpic, const Rect& rectangle, Mode mode, bool useAlpha, bool updateTexture )
 {
@@ -239,7 +239,7 @@ void Decorator::draw( Picture& dstpic, const Rect& rectangle, Mode mode, bool us
 
   switch( mode )
   {
-  case whiteArea: drawArea( dstpic, rectangle, 348, 10, 12, useAlpha ); break;  
+  /*case whiteArea: drawArea( dstpic, rectangle, 348, 10, 12, useAlpha ); break;
   case blackArea: drawArea( dstpic, rectangle, 487, 5, 7, useAlpha ); break;
   case greyPanel: drawPanel( dstpic, rectangle, 25, useAlpha ); break;
   case lightgreyPanel: drawPanel( dstpic, rectangle, 22, useAlpha ); break;
@@ -262,7 +262,7 @@ void Decorator::draw( Picture& dstpic, const Rect& rectangle, Mode mode, bool us
   break;
 
   case brownFrame: drawFrame(dstpic, rectangle, 28, useAlpha); break;
-  case greyFrame: drawFrame(dstpic, rectangle, 37, useAlpha); break;
+  case greyFrame: drawFrame(dstpic, rectangle, 37, useAlpha); break;*/
 
   case lineBlackBorder:
   case lineWhiteBorder:
@@ -275,7 +275,9 @@ void Decorator::draw( Picture& dstpic, const Rect& rectangle, Mode mode, bool us
   }
   break;
 
-  default: break;
+  default:
+    Logger::warning( "WARNING !!!: Unsupport draw instuctions" );
+  break;
   }
 
   if( updateTexture )
@@ -299,8 +301,11 @@ void Decorator::draw( Pictures& stack, const Rect& rectangle, Decorator::Mode mo
   case brownBorder: drawBorder(stack, rectangle, 555 ); break;
   case whiteBorderA: drawBorder( stack, rectangle, 547 ); break;
   case whiteFrame:
-    draw( stack, Rect( rectangle.UpperLeftCorner, rectangle.LowerRightCorner - Point( 16, 16 ) ), whiteArea );    // draws the inside of the box
+  {
+    Point offset( 16, 16 );
+    draw( stack, Rect( rectangle.UpperLeftCorner + offset, rectangle.LowerRightCorner - offset ), whiteArea );
     draw( stack, rectangle, whiteBorder );    // draws borders
+  }
   break;
 
   case blackFrame:
@@ -315,7 +320,7 @@ void Decorator::draw( Pictures& stack, const Rect& rectangle, Decorator::Mode mo
   }
 }
 
-void Decorator::drawBorder( Picture &dstpic, const Rect& rectangle, 
+/*void Decorator::drawBorder( Picture &dstpic, const Rect& rectangle,
                                    int tp, int bp, int lp, int rp, 
                                    int pCount, int hCount,
                                    int ltc, int lbc, int rtc, int rbc, bool useAlpha )
@@ -343,7 +348,7 @@ void Decorator::drawBorder( Picture &dstpic, const Rect& rectangle,
   dstpic.draw( Picture::load( ResourceGroup::panelBackground, lbc), Point( rectangle.left(), rectangle.bottom()-sh ), useAlpha );    // left-bottom corner
   dstpic.draw( Picture::load( ResourceGroup::panelBackground, rtc ), Point( rectangle.right() - sw, rectangle.top() ), useAlpha );     // right-top corner
   dstpic.draw( Picture::load( ResourceGroup::panelBackground, rbc), rectangle.LowerRightCorner - Point( sw, sh ), useAlpha );    // right-bottom corner
-}
+}*/
 
 void Decorator::drawBorder( Pictures& stack, const Rect& rectangle,
                                    int tp, int bp, int lp, int rp,
@@ -360,45 +365,50 @@ void Decorator::drawBorder( Pictures& stack, const Rect& rectangle,
     return;
   }
 
-  for (int i = 0; i<(rectangle.width()/size.width()-1); ++i)
+  int xOff=sw, yOff=sh, i=0;
+  for( ; xOff < rectangle.width()-sw; xOff += sw)
   {
-    Point offset = rectangle.UpperLeftCorner + Point( sw+sw*i, 0 );
+    Point offset = Point( xOff, 0 );
     stack.append( Picture::load( ResourceGroup::panelBackground, tp+i%pCount), offset );      // top border
     stack.append( Picture::load( ResourceGroup::panelBackground, bp+i%pCount), offset - Point( 0, rectangle.height()-sh ) );      // bottom border
+    i++;
   }
 
   // draws vertical borders
-  for (int i = 0; i<(rectangle.height()/size.height()); ++i)
+  i = 0;
+  for( ; yOff < rectangle.height()-sh; yOff += sh)
   {
-    Point offset = rectangle.lefttop() + Point( 0, -sh*i );
+    Point offset = rectangle.lefttop() + Point( 0, -yOff );
     stack.append( Picture::load( ResourceGroup::panelBackground, lp+hCount*(i%pCount)), offset );      // left border
     stack.append( Picture::load( ResourceGroup::panelBackground, rp+hCount*(i%pCount)), offset + Point( rectangle.width()-sw, 0 ) );      // right border
+    i++;
   }
 
   stack.append( Picture::load( ResourceGroup::panelBackground, ltc), rectangle.lefttop() );    // left-top corner
   stack.append( Picture::load( ResourceGroup::panelBackground, lbc), Point( rectangle.left(), -rectangle.bottom()+sh ) );    // left-bottom corner
-  stack.append( Picture::load( ResourceGroup::panelBackground, rtc ), Point( rectangle.right() - sw, rectangle.top() ) );     // right-top corner
+  stack.append( Picture::load( ResourceGroup::panelBackground, rtc), Point( rectangle.right() - sw, rectangle.top() ) );     // right-top corner
   stack.append( Picture::load( ResourceGroup::panelBackground, rbc), Point( rectangle.right() - sw, -rectangle.bottom()+sh ) );    // right-bottom corner
 }
 
 void Decorator::drawArea( Pictures &stack, const Rect& rectangle, int picId, int picCount, int offset )
 {
-  for( int j = 0; j*16 < rectangle.height(); j++ )
+  Point roffset( rectangle.left(), -rectangle.top() );
+  int dj = 0;
+  for( int dy = 0; dy < rectangle.height(); dy += 16 )
   {
-    for (int i = 0; i*16 < rectangle.width(); i++)
+    int di = 0;
+    for (int dx = 0; dx < rectangle.width(); dx += 16 )
     {
       // use some clipping to remove the right and bottom areas
-      const Picture &srcpic = Picture::load( ResourceGroup::panelBackground, picId + (i%picCount) + offset*(j%picCount) );
-
-      int dx = 16*i;
-      int dy = 16*j;
-
-      stack.append( srcpic, rectangle.UpperLeftCorner + Point( dx, -dy ) );
+      const Picture &srcpic = Picture::load( ResourceGroup::panelBackground, picId + (di%picCount) + offset*(dj%picCount) );
+      stack.append( srcpic, roffset + Point( dx, -dy) );
+      di++;
     }
-  }
+    dj++;
+  } 
 }
 
-void Decorator::drawArea(Picture &dstpic, const Rect& rectangle, int picId, int picCount, int offset, bool useAlpha)
+/*void Decorator::drawArea(Picture &dstpic, const Rect& rectangle, int picId, int picCount, int offset, bool useAlpha)
 {
   for (int j = 0; j<(rectangle.height()/16+1); ++j)
   {
@@ -415,6 +425,6 @@ void Decorator::drawArea(Picture &dstpic, const Rect& rectangle, int picId, int 
       dstpic.draw( srcpic, Rect( 0, 0, sw, sh), rectangle.UpperLeftCorner + Point( dx, dy ) );
     }
   }
-}
+}*/
 
 }//end namespace gfx

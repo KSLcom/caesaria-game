@@ -41,8 +41,8 @@ class Picture::Impl
 {
 public:  
   Point offset;  // the image is shifted when displayed
-  Size size;
   std::string name; // for game save
+  Rect orect;
   SDL_Surface* surface;
   SDL_Texture* texture;  // for SDL surface
   unsigned int opengltx;
@@ -52,7 +52,6 @@ Picture::Picture() : _d( new Impl )
 {
   _d->texture = NULL;
   _d->offset = Point( 0, 0 );
-  _d->size = Size( 0 );
   _d->name = "";
   _d->surface = 0;
   _d->opengltx = 0;
@@ -68,21 +67,12 @@ void Picture::init(SDL_Texture *texture, SDL_Surface* srf, unsigned int ogltx)
   _d->texture = texture;
   _d->surface = srf;
   _d->opengltx = ogltx;
-
-  if( _d->texture != 0 )
-  {
-    int w, h;
-    SDL_QueryTexture( texture, 0, 0, &w, &h );
-    _d->size = Size( w, h );
-  }
-  else if( srf != 0 )
-  {
-    _d->size = Size( srf->w, srf->h );
-  }
 }
 
 void Picture::setOffset(const Point &offset ) { _d->offset = offset; }
 void Picture::setOffset(int x, int y) { _d->offset = Point( x, y ); }
+void Picture::setOriginRect(const Rect& rect) { _d->orect = rect; }
+const Rect&Picture::originRect() const { return _d->orect; }
 void Picture::addOffset( const Point& offset ) { _d->offset += offset; }
 void Picture::addOffset( int x, int y ) { _d->offset += Point( x, y ); }
 
@@ -91,12 +81,13 @@ SDL_Surface*Picture::surface() const { return _d->surface;  }
 unsigned int Picture::textureID() const { return _d->opengltx; }
 unsigned int& Picture::textureID() { return _d->opengltx; }
 const Point& Picture::offset() const{  return _d->offset;}
-int Picture::width() const{  return _d->size.width();}
-int Picture::height() const{  return _d->size.height();}
+
+int Picture::width() const{  return _d->orect.width();}
+int Picture::height() const{  return _d->orect.height();}
 int Picture::pitch() const { return width() * 4; }
 void Picture::setName(const std::string &name){  _d->name = name;}
 std::string Picture::name() const{  return _d->name;}
-const Size& Picture::size() const{  return _d->size; }
+Size Picture::size() const{  return _d->orect.size(); }
 unsigned int Picture::sizeInBytes() const { return size().area() * 4; }
 Picture& Picture::load( const std::string& group, const int id ){  return PictureBank::instance().getPicture( group, id );}
 Picture& Picture::load( const std::string& filename ){  return PictureBank::instance().getPicture( filename );}
@@ -119,7 +110,7 @@ void Picture::setAlpha(unsigned char value)
   }
 }
 
-void Picture::draw(const Picture &srcpic, const Rect& srcrect, const Point& pos, bool useAlpha )
+/*void Picture::draw(const Picture &srcpic, const Rect& srcrect, const Point& pos, bool useAlpha )
 {
   draw( srcpic, srcrect, Rect( pos, srcrect.size() ), useAlpha );
 }
@@ -156,14 +147,14 @@ void Picture::draw(const Picture &srcpic, const Point& pos, bool useAlpha )
 
 }
 
-void Picture::draw(const Picture &srcpic, int x, int y, bool useAlpha/*=true */ )
+void Picture::draw(const Picture &srcpic, int x, int y, bool useAlpha )
 {
   draw( srcpic, Point( x, y ), useAlpha );
-}
+} */
 
 unsigned int* Picture::lock()
 {
-  if( _d->texture )
+  /*if( _d->texture )
   {
     int a;
     SDL_QueryTexture( _d->texture, 0, &a, 0, 0 );
@@ -180,7 +171,7 @@ unsigned int* Picture::lock()
 
       return pixels;
     }
-  }
+  }*/
 
   if( _d->surface )
   {
@@ -196,7 +187,7 @@ unsigned int* Picture::lock()
 
 void Picture::unlock()
 {
-  if( _d->texture )
+  /*if( _d->texture )
   {
     int a;
     SDL_QueryTexture( _d->texture, 0, &a, 0, 0 );
@@ -205,8 +196,7 @@ void Picture::unlock()
       SDL_UnlockTexture(_d->texture);
     }
   }
-
-  if( _d->surface )
+  else if( _d->surface )*/
   {
     if( SDL_MUSTLOCK(_d->surface) )
     {
@@ -217,7 +207,7 @@ void Picture::unlock()
 
 Picture& Picture::operator=( const Picture& other )
 {
-  _d->size = other._d->size;
+  _d->orect = other._d->orect;
   _d->name = other._d->name;
   _d->texture = other._d->texture;
   _d->offset = other._d->offset;
@@ -236,31 +226,15 @@ void Picture::destroy( Picture* ptr )
 
 void Picture::update()
 {
-  if( _d->surface )
+  if( _d->texture && _d->surface )
   {
-    if( _d->texture )
-    {
-      int access;
-      SDL_QueryTexture( _d->texture, 0, &access, 0, 0 );
-      /*if( access == SDL_TEXTUREACCESS_STREAMING )
-      {
-        void* pixels = 0;
-        int pitch;
-        int result = SDL_LockTexture(_d->texture, 0, &pixels, &pitch );
-        if( result == 0 )
-        {
-          memcpy( pixels, _d->surface->pixels, _d->surface->h * pitch );
-        }
-      }
-      else*/
-      {
-        SDL_UpdateTexture(_d->texture, 0, _d->surface->pixels, _d->surface->pitch );
-      }
-    }
-    else if( _d->opengltx > 0 )
-    {
-      Engine::instance().loadPicture( *this, false );
-    }
+    SDL_UpdateTexture(_d->texture, 0, _d->surface->pixels, _d->surface->pitch );
+    return;
+  }
+
+  if( _d->surface && _d->opengltx > 0 )
+  {    
+    Engine::instance().loadPicture( *this, false );
   }
 }
 
@@ -281,7 +255,7 @@ Picture* Picture::create(const Size& size, unsigned char* data, bool mayChange)
 {
   Picture *pic = new Picture();
 
-  pic->_d->size = size;
+  pic->_d->orect = Rect( 0, 0, size.width(), size.height() );
   if( data )
   {
     pic->_d->surface = SDL_CreateRGBSurfaceFrom( data, size.width(), size.height(), 32, size.width() * 4,

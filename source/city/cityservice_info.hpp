@@ -62,7 +62,7 @@ public:
   {
     std::string text;
     std::string title;
-    Good::Type gtype;
+    good::Product gtype;
     Point position;
     int type;
     DateTime date;
@@ -79,10 +79,10 @@ public:
 
   static SrvcPtr create( PlayerCityPtr city );
 
-  void update( const unsigned int time );
+  virtual void timeStep( const unsigned int time );
   Parameters lastParams() const;
-  Parameters params( int monthAgo ) const;
-  Parameters yearParams( int year ) const;
+  Parameters params( unsigned int monthAgo ) const;
+  Parameters yearParams( unsigned int year ) const;
   const MaxParameters& maxParams() const;
 
   const History& history() const;
@@ -99,7 +99,7 @@ public:
   void addMessage( const ScribeMessage& message );
 
 private:
-  Info( PlayerCityPtr city );
+  Info(PlayerCityPtr city);
 
   class Impl;
   ScopedPtr< Impl > _d;

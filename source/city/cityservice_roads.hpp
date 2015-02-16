@@ -31,10 +31,10 @@ public:
   static SrvcPtr create( PlayerCityPtr city );
   static std::string defaultName();
 
-  void update( const unsigned int time );
+  virtual void timeStep( const unsigned int time );
   virtual ~Roads();
 private:
-  Roads( PlayerCityPtr city );
+  Roads(PlayerCityPtr city);
 
   class Impl;
   ScopedPtr< Impl > _d;

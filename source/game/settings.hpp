@@ -22,7 +22,10 @@
 #include "core/variant.hpp"
 #include "vfs/path.hpp"
 
-class GameSettings
+namespace game
+{
+
+class Settings
 {
 public:
 #define __GS_PROPERTY(a) static const char* a;
@@ -38,6 +41,7 @@ public:
   __GS_PROPERTY(language)
   __GS_PROPERTY(resolution)
   __GS_PROPERTY(fullscreen)
+  __GS_PROPERTY(climateModel)
   __GS_PROPERTY(savedir)
   __GS_PROPERTY(emigrantSalaryKoeff)
   __GS_PROPERTY(minMonthWithFood)
@@ -49,6 +53,7 @@ public:
   __GS_PROPERTY(workDir)
   __GS_PROPERTY(lastTranslation)
   __GS_PROPERTY(c3gfx)
+  __GS_PROPERTY(oldgfx)
   __GS_PROPERTY(archivesModel)
   __GS_PROPERTY(soundThemesModel)
   __GS_PROPERTY(soundVolume)
@@ -70,10 +75,23 @@ public:
   __GS_PROPERTY(picsArchive)
   __GS_PROPERTY(opengl_opts)
   __GS_PROPERTY(font)
+  __GS_PROPERTY(walkerRelations)
   __GS_PROPERTY(freeplay_opts)
+  __GS_PROPERTY(cellw)
+  __GS_PROPERTY(simpleAnimationModel)
+  __GS_PROPERTY(hotkeysModel)
+  __GS_PROPERTY(cartsModel)
+  __GS_PROPERTY(logoArchive)
+  __GS_PROPERTY(titleResource)
+  __GS_PROPERTY(forbidenTile)
+  __GS_PROPERTY(layersOptsModel)
+  __GS_PROPERTY(experimental)
+  __GS_PROPERTY(scrollSpeed)
+  __GS_PROPERTY(buildMenuModel)
+  __GS_PROPERTY(borderMoving)
 #undef __GS_PROPERTY
 
-  static GameSettings& instance();
+  static Settings& instance();
 
   static void set( const std::string& option, const Variant& value );
   static Variant get( const std::string& option );
@@ -85,15 +103,20 @@ public:
   static void save();
 
   void setwdir( const std::string& wdir );
+  void checkwdir( char* argv[], int argc );
+  void checkCmdOptions( char* argv[], int argc );
+  void checkC3present();
 private:
-  GameSettings();
+  Settings();
 
   class Impl;
   ScopedPtr< Impl > _d;
 };
 
-#define SETTINGS_RC_PATH(a) GameSettings::rcpath( GameSettings::a )
-#define SETTINGS_VALUE(a) GameSettings::get( GameSettings::a )
-#define SETTINGS_SET_VALUE(a, value) GameSettings::set( GameSettings::a, value )
+}//end namespace game
+
+#define SETTINGS_RC_PATH(a) game::Settings::rcpath( game::Settings::a )
+#define SETTINGS_VALUE(a) game::Settings::get( game::Settings::a )
+#define SETTINGS_SET_VALUE(a, value) game::Settings::set( game::Settings::a, value )
 
 #endif //__CAESARIA_APPCONFIG_H_INCLUDED__

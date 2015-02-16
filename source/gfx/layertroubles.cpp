@@ -28,15 +28,19 @@
 #include "objects/watersupply.hpp"
 #include "tilemap_camera.hpp"
 #include "objects/factory.hpp"
+#include "core/utils.hpp"
 
 using namespace constants;
 
 namespace gfx
 {
 
-int LayerTroubles::type() const{  return _type;}
+namespace layer
+{
 
-void LayerTroubles::drawTile(Engine& engine, Tile& tile, const Point& offset)
+int Troubles::type() const{ return _type;}
+
+void Troubles::drawTile(Engine& engine, Tile& tile, const Point& offset)
 {
   Point screenPos = tile.mappos() + offset;
 
@@ -50,26 +54,12 @@ void LayerTroubles::drawTile(Engine& engine, Tile& tile, const Point& offset)
     bool needDrawAnimations = false;
     TileOverlayPtr overlay = tile.overlay();
 
-    switch( overlay->type() )
+    if( _isVisibleObject( overlay->type() ) )
     {
-    // Base set of visible objects
-    case construction::road:
-    case construction::plaza:
-    case construction::garden:
-
-    case building::burnedRuins:
-    case building::collapsedRuins:
-
-    case building::lowBridge:
-    case building::highBridge:
-
-    case building::elevation:
-    case building::rift:
+      // Base set of visible objects
       needDrawAnimations = true;
-    break;
-
-    //other buildings
-    default:
+    }
+    else
     {
       ConstructionPtr c = ptr_cast<Construction>( overlay );
       if( c.isValid() )
@@ -77,8 +67,6 @@ void LayerTroubles::drawTile(Engine& engine, Tile& tile, const Point& offset)
         std::string trouble = c->troubleDesc();
         needDrawAnimations = !trouble.empty();
       }
-    }
-    break;
     }
 
     if( needDrawAnimations )
@@ -96,15 +84,15 @@ void LayerTroubles::drawTile(Engine& engine, Tile& tile, const Point& offset)
   tile.setWasDrawn();
 }
 
-LayerPtr LayerTroubles::create(Camera& camera, PlayerCityPtr city , int type)
+LayerPtr Troubles::create(Camera& camera, PlayerCityPtr city , int type)
 {
-  LayerPtr ret( new LayerTroubles( camera, city, type ) );
+  LayerPtr ret( new Troubles( camera, city, type ) );
   ret->drop();
 
   return ret;
 }
 
-void LayerTroubles::handleEvent(NEvent& event)
+void Troubles::handleEvent(NEvent& event)
 {
   if( event.EventType == sEventMouse )
   {
@@ -125,20 +113,21 @@ void LayerTroubles::handleEvent(NEvent& event)
           if( text.empty() )
           {
             WorkingBuildingPtr wb = ptr_cast<WorkingBuilding>( constr );
-            if( wb.isValid() )
+            if( text.empty() && wb.isValid() )
             {
               int laborAccess = wb->laborAccessPercent();
               if( wb->getAccessRoads().empty() || laborAccess == 0 )
               {
                 text = "##working_have_no_labor_access##";
-              }
+              }              
               else
               {
-                if( laborAccess < 20 ) { text = "##working_have_bad_labor_access##"; }
-                else if( laborAccess < 40 ) { text = "##working_have_very_little_labor_access##"; }
-                else if( laborAccess < 60 ) { text = "##working_have_some_labor_access##"; }
-                else if( laborAccess < 80 ) { text = "##working_have_good_labor_access##"; }
-                else if( laborAccess <= 100 ) { text = "##working_have_awsesome_labor_access##"; }
+                if( laborAccess < 25 ) { text = "##working_have_bad_labor_access##"; }
+                else if( laborAccess < 50 ) { text = "##working_have_very_little_labor_access##"; }
+                else if( laborAccess < 75 ) { text = "##working_have_some_labor_access##"; }
+                else if( laborAccess < 100 ) { text = "##working_have_good_labor_access##"; }
+                //else if( laborAccess < 100 ) { text = "##working_have_awsesome_labor_access##"; }
+                else { text = ""; } //no problem with labor access
               }
             }
           }
@@ -156,10 +145,13 @@ void LayerTroubles::handleEvent(NEvent& event)
   Layer::handleEvent( event );
 }
 
-LayerTroubles::LayerTroubles( Camera& camera, PlayerCityPtr city, int type )
+Troubles::Troubles( Camera& camera, PlayerCityPtr city, int type )
   : Layer( &camera, city ), _type( type )
 {
-  _loadColumnPicture( 9 );
+  //_loadColumnPicture( 9 );
+  _fillVisibleObjects( _type );
+}
+
 }
 
 }//end namespace gfx

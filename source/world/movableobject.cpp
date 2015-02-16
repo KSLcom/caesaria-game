@@ -24,7 +24,7 @@
 #include "empiremap.hpp"
 #include "gfx/tilesarray.hpp"
 #include "game/resourcegroup.hpp"
-#include <map>
+#include "core/variant_map.hpp"
 
 using namespace gfx;
 
@@ -52,7 +52,7 @@ MovableObject::~MovableObject(){}
 void MovableObject::setSpeed(float speed)
 {
   __D_IMPL(d,MovableObject)
-  d->speed = GameDate::days2ticks( DateTime::daysInWeek ) / speed;
+  d->speed = game::Date::days2ticks( DateTime::daysInWeek ) / speed;
 }
 
 void MovableObject::timeStep(const unsigned int time)
@@ -107,7 +107,7 @@ void MovableObject::save(VariantMap& stream) const
   foreach( i, d->way ) { pointsVl.push_back( *i ); }
 
   stream[ "points" ] = pointsVl;
-  stream[ "step"   ] = d->way.step;
+  stream[ "step"   ] = (int)d->way.step;
 }
 
 void MovableObject::load(const VariantMap& stream)
@@ -119,7 +119,7 @@ void MovableObject::load(const VariantMap& stream)
   VARIANT_LOAD_ANY_D( d, start, stream )
   VARIANT_LOAD_ANY_D( d, stop, stream )
 
-  d->way.step = stream.get( "step" );
+  d->way.step = (int)stream.get( "step" );
   VariantList points = stream.get( "points" ).toList();
   foreach( i, points ) { d->way.push_back( (*i).toPoint() ); }
 }
@@ -142,6 +142,44 @@ bool MovableObject::_findWay( Point p1, Point p2 )
   }
 
   return true;
+}
+
+class Messenger::Impl
+{
+public:
+  std::string title;
+  std::string message;
+};
+
+Messenger::~Messenger()
+{
+
+}
+
+void Messenger::now( EmpirePtr empire,
+                     const std::string& cityname,
+                     const std::string& title,
+                     const std::string& message)
+{
+  Messenger* m = new Messenger( empire );
+  m->_dfunc()->title = title;
+  m->_dfunc()->message = message;
+
+  ObjectPtr obj( m );
+  obj->drop();
+
+  CityPtr pcity = empire->findCity(cityname );
+  if( pcity.isValid() )
+    pcity->addObject( obj );
+}
+
+std::string Messenger::title() const { return _dfunc()->title; }
+std::string Messenger::message() const { return _dfunc()->message; }
+
+Messenger::Messenger(EmpirePtr empire)
+ : MovableObject( empire ), __INIT_IMPL(Messenger)
+{
+
 }
 
 }

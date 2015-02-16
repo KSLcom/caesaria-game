@@ -22,25 +22,28 @@
 #include "world/empire.hpp"
 #include "core/gettext.hpp"
 #include "widget_helper.hpp"
-#include "core/stringhelper.hpp"
+#include "core/utils.hpp"
 
 namespace gui
 {
 
-class ChangeSalaryWindow::Impl
+namespace dialog
+{
+
+class ChangeSalary::Impl
 {
 public:
   int newSalary;
 
-public oc3_slots:
+public slots:
   void resolveSalaryChange(const ListBoxItem&);
   void setNewSalary();
 
-public oc3_signals:
+public signals:
   Signal1<int> onChangeSalarySignal;
 };
 
-ChangeSalaryWindow::ChangeSalaryWindow(Widget* p, unsigned int salary)
+ChangeSalary::ChangeSalary(Widget* p, unsigned int salary)
   : Window( p, Rect(), "" ), __INIT_IMPL(ChangeSalaryWindow)
 {
   setupUI( ":/gui/changesalary.gui");
@@ -56,7 +59,7 @@ ChangeSalaryWindow::ChangeSalaryWindow(Widget* p, unsigned int salary)
     foreach( i, ranks )
     {
       std::string salaryStr = _( "##" + (*i).rankName + "_salary##" );
-      ListBoxItem& item = lbxTitles->addItem( salaryStr + "   " + StringHelper::i2str( (*i).salary ) );
+      ListBoxItem& item = lbxTitles->addItem( salaryStr + "   " + utils::i2str( (*i).salary ) );
       item.setTag( (*i).salary );
       if( (*i).salary == salary )
       {
@@ -65,21 +68,20 @@ ChangeSalaryWindow::ChangeSalaryWindow(Widget* p, unsigned int salary)
     }
   }
 
-  PushButton* btnCancel;
-  PushButton* btnOk;
-  GET_WIDGET_FROM_UI( btnCancel  )
-  GET_WIDGET_FROM_UI( btnOk )
+  INIT_WIDGET_FROM_UI( PushButton*, btnCancel  )
+  INIT_WIDGET_FROM_UI( PushButton*, btnOk )
 
-  CONNECT( btnCancel, onClicked(), this, ChangeSalaryWindow::deleteLater );
+  CONNECT( btnCancel, onClicked(), this, ChangeSalary::deleteLater );
   CONNECT( btnOk, onClicked(), _dfunc().data(), Impl::setNewSalary );
-  CONNECT( btnOk, onClicked(), this, ChangeSalaryWindow::deleteLater  );
+  CONNECT( btnOk, onClicked(), this, ChangeSalary::deleteLater  );
   CONNECT( lbxTitles, onItemSelected(), _dfunc().data(), Impl::resolveSalaryChange );
 }
 
-ChangeSalaryWindow::~ChangeSalaryWindow(){}
-Signal1<int>& ChangeSalaryWindow::onChangeSalary(){  return _dfunc()->onChangeSalarySignal; }
-void ChangeSalaryWindow::Impl::resolveSalaryChange(const ListBoxItem& item ) { newSalary = item.tag(); }
-void ChangeSalaryWindow::Impl::setNewSalary(){ oc3_emit onChangeSalarySignal( newSalary ); }
+ChangeSalary::~ChangeSalary(){}
+Signal1<int>& ChangeSalary::onChangeSalary(){  return _dfunc()->onChangeSalarySignal; }
+void ChangeSalary::Impl::resolveSalaryChange(const ListBoxItem& item ) { newSalary = item.tag(); }
+void ChangeSalary::Impl::setNewSalary(){ emit onChangeSalarySignal( newSalary ); }
 
+}//end namespace dialog
 
 }//end namespace gui

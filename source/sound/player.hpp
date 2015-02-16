@@ -28,9 +28,9 @@ namespace audio
 class Player : public city::Srvc
 {
 public:
-  static city::SrvcPtr create( PlayerCityPtr city );
+  static city::SrvcPtr create(PlayerCityPtr city);
   static std::string defaultName();
-  void update( const unsigned int time );
+  virtual void timeStep( const unsigned int time );
 
   virtual ~Player();
 private:

@@ -13,18 +13,23 @@
 // You should have received a copy of the GNU General Public License
 // along with CaesarIA.  If not, see <http://www.gnu.org/licenses/>.
 //
-// Copyright 2012-2014 Dalerank, dalerankn8@gmail.com
+// Copyright 2012-2015 Dalerank, dalerankn8@gmail.com
 
 #include "engineer_post.hpp"
 #include "game/resourcegroup.hpp"
 #include "core/position.hpp"
 #include "constants.hpp"
+#include "objects_factory.hpp"
 
 using namespace gfx;
+using namespace constants;
 
-EngineerPost::EngineerPost() : ServiceBuilding( Service::engineer, constants::building::engineerPost, Size(1) )
+REGISTER_CLASS_IN_OVERLAYFACTORY( objects::engineering_post, EngineerPost)
+
+EngineerPost::EngineerPost() : ServiceBuilding( Service::engineer, constants::objects::engineering_post, Size(1) )
 {
-  setPicture( ResourceGroup::buildingEngineer, 56 );
+  setPicture( MetaDataHolder::randomPicture( type(), size() ) );
+  //setPicture( ResourceGroup::buildingEngineer, 56 );
 
   _animationRef().load( ResourceGroup::buildingEngineer, 57, 10 );
   _animationRef().setDelay( 4 );

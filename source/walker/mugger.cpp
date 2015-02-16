@@ -30,11 +30,14 @@
 #include "corpse.hpp"
 #include "ability.hpp"
 #include "game/resourcegroup.hpp"
-#include "core/variant.hpp"
+#include "core/variant_map.hpp"
 #include "game/gamedate.hpp"
+#include "walkers_factory.hpp"
 
 using namespace constants;
 using namespace gfx;
+
+REGISTER_CLASS_IN_WALKERFACTORY(walker::mugger, Mugger)
 
 class Mugger::Impl
 {
@@ -44,7 +47,8 @@ public:
   State state;
 };
 
-Mugger::Mugger(PlayerCityPtr city) : Walker( city ), _d( new Impl )
+Mugger::Mugger(PlayerCityPtr city)
+  : Human( city ), _d( new Impl )
 {    
   _setType( walker::mugger );
 
@@ -69,7 +73,7 @@ void Mugger::_reachedPathway()
   }
 }
 
-void Mugger::_updateThinks()
+void Mugger::_updateThoughts()
 {
   StringArray ret;
   ret << "##rioter_say_1##" << "##rioter_say_2##" << "##rioter_say_3##";
@@ -88,7 +92,7 @@ void Mugger::timeStep(const unsigned long time)
     city::Helper helper( _city() );
     TilePos offset(10, 10);
 
-    HouseList houses = helper.find<House>( building::house, pos() - offset, pos() + offset );
+    HouseList houses = helper.find<House>( objects::house, pos() - offset, pos() + offset );
     std::map< int, HouseList > houseEpxens;
     foreach( it, houses )
     {
@@ -145,10 +149,10 @@ void Mugger::timeStep(const unsigned long time)
 
   case Impl::robHouse:
   {
-    if( GameDate::isDayChanged() )
+    if( game::Date::isDayChanged() )
     {
       city::Helper helper( _city() );
-      HouseList houses = helper.find<House>( building::house, pos() - TilePos( 1, 1), pos() + TilePos( 1, 1) );
+      HouseList houses = helper.find<House>( objects::house, pos() - TilePos( 1, 1), pos() + TilePos( 1, 1) );
 
       foreach( it, houses )
       {

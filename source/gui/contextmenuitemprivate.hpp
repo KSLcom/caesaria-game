@@ -39,8 +39,9 @@ public:
 	ContextMenu* subMenu;
 	SubMenuAlign subMenuAlignment;
 
-oc3_signals public:
+signals public:
 	Signal1<bool> onCheckedSignal;
+	Signal1<int> onActionSignal;
 };
 
 }//end namespace gui

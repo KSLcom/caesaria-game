@@ -24,20 +24,25 @@
 namespace gfx
 {
 
-class LayerWater : public Layer
+namespace layer
+{
+
+class Water : public Layer
 {
 public:
   virtual int type() const;
   virtual void drawTile( Engine& engine, Tile& tile, const Point& offset );
-  virtual void drawTileW(Engine &engine, Tile &tile, const Point& offset, const int depth);
+  virtual void drawWalkerOverlap(Engine &engine, Tile &tile, const Point& offset, const int depth);
 
   static LayerPtr create( Camera& camera, PlayerCityPtr city );
   virtual void handleEvent(NEvent& event);
 private:
-  LayerWater( Camera& camera, PlayerCityPtr city );
+  Water( Camera& camera, PlayerCityPtr city );
   std::set<int> _flags;
   bool _showWaterValue;
 };
+
+}//end namespace layer
 
 }//end namespace gfx
 

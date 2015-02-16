@@ -19,6 +19,7 @@
 #include "objects/construction.hpp"
 #include "city/helper.hpp"
 #include "core/safetycast.hpp"
+#include "core/variant_map.hpp"
 #include "core/position.hpp"
 #include "city/statistic.hpp"
 #include "objects/house.hpp"
@@ -30,6 +31,7 @@
 #include "world/empire.hpp"
 #include "objects/hippodrome.hpp"
 #include "objects/constants.hpp"
+#include "cityservice_info.hpp"
 
 using namespace  constants;
 
@@ -51,7 +53,7 @@ public:
   int percentPlebs;
 };
 
-SrvcPtr ProsperityRating::create(PlayerCityPtr city )
+SrvcPtr ProsperityRating::create( PlayerCityPtr city )
 {
   SrvcPtr ret( new ProsperityRating( city ) );
   ret->drop();
@@ -59,39 +61,42 @@ SrvcPtr ProsperityRating::create(PlayerCityPtr city )
   return ret;
 }
 
-ProsperityRating::ProsperityRating(PlayerCityPtr city )
-  : Srvc( *city.object(), defaultName() ), _d( new Impl )
+ProsperityRating::ProsperityRating(PlayerCityPtr city)
+  : Srvc( city, defaultName() ), _d( new Impl )
 {
-  _d->lastDate = GameDate::current();
+  _d->lastDate = game::Date::current();
   _d->prosperity = 0;
   _d->houseCapTrand = 0;
   _d->prosperityExtend = 0;
   _d->makeProfit = false;
-  _d->lastYearBalance = city->funds().treasury();
+  _d->lastYearBalance = 0;
   _d->worklessPercent = 0;
-  _d->workersSalary = city->funds().workerSalary();
+  _d->workersSalary = 0;
   _d->lastYearProsperity = 0;
   _d->percentPlebs = 0;
 }
 
-void ProsperityRating::update( const unsigned int time )
+void ProsperityRating::timeStep(const unsigned int time )
 {
-  if( !GameDate::isMonthChanged() )
+  if( !game::Date::isMonthChanged() )
     return;
 
-  if( GameDate::current().year() > _d->lastDate.year() )
-  {
-    _d->lastDate = GameDate::current();
+  if( game::Date::current().year() > _d->lastDate.year() )
+  {          
+    _d->lastYearBalance = _city()->funds().getIssueValue( city::Funds::balance, city::Funds::lastYear );
+    _d->workersSalary = _city()->funds().workerSalary();
 
-    if( _city.population() == 0 )
+    _d->lastDate = game::Date::current();
+
+    if( _city()->population() == 0 )
     {
       _d->prosperity = 0;
       _d->prosperityExtend = 0;
       return;
     }
 
-    Helper helper( &_city );
-    HouseList houses = helper.find<House>( building::house );
+    Helper helper( _city() );
+    HouseList houses = helper.find<House>( objects::house );
 
     int prosperityCap = 0;
     int patricianCount = 0;
@@ -115,21 +120,21 @@ void ProsperityRating::update( const unsigned int time )
     _d->prosperity = math::clamp<int>( prosperityCap, 0, _d->prosperity + 2 );
     _d->houseCapTrand = _d->prosperity - saveValue;
 
-    int currentFunds = _city.funds().treasury();
+    int currentFunds = _city()->funds().treasury();
     _d->makeProfit = _d->lastYearBalance < currentFunds;
     _d->lastYearBalance = currentFunds;
     _d->prosperityExtend = (_d->makeProfit ? 2 : -1);
 
-    bool more10PercentIsPatrician = (patricianCount / (float)_city.population()) > 0.1;
+    bool more10PercentIsPatrician = (patricianCount / (float)_city()->population()) > 0.1;
     _d->prosperityExtend += (more10PercentIsPatrician ? 1 : 0);
 
-    _d->percentPlebs = math::percentage( plebsCount, _city.population() );
+    _d->percentPlebs = math::percentage( plebsCount, _city()->population() );
     _d->prosperityExtend += (_d->percentPlebs < 30 ? 1 : 0);
 
-    bool haveHippodrome = !helper.find<Hippodrome>( building::hippodrome ).empty();
+    bool haveHippodrome = !helper.find<Hippodrome>( objects::hippodrome ).empty();
     _d->prosperityExtend += (haveHippodrome ? 1 : 0);
 
-    _d->worklessPercent = city::Statistic::getWorklessPercent( &_city );
+    _d->worklessPercent = statistic::getWorklessPercent( _city() );
     bool unemploymentLess5percent = _d->worklessPercent < 5;
     bool unemploymentMore15percent = _d->worklessPercent > 15;
 
@@ -139,15 +144,15 @@ void ProsperityRating::update( const unsigned int time )
     bool havePatrician = patricianCount > 0;
     _d->prosperityExtend += (havePatrician ? 1 : 0);
 
-    _d->workersSalary = _city.funds().workerSalary() - _city.empire()->workerSalary();
+    _d->workersSalary = _city()->funds().workerSalary() - _city()->empire()->workerSalary();
     _d->prosperityExtend += (_d->workersSalary > 0 ? 1 : 0);
     _d->prosperityExtend += (_d->workersSalary < 0 ? -1 : 0);
    
-    _d->prosperityExtend += (_city.haveOverduePayment() ? -3 : 0);
-    _d->prosperityExtend += (_city.isPaysTaxes() ? -3 : 0);
+    _d->prosperityExtend += (_city()->haveOverduePayment() ? -3 : 0);
+    _d->prosperityExtend += (_city()->isPaysTaxes() ? -3 : 0);
 
-    unsigned int caesarsHelper = _city.funds().getIssueValue( city::Funds::caesarsHelp, city::Funds::thisYear );
-    caesarsHelper += _city.funds().getIssueValue( city::Funds::caesarsHelp, city::Funds::lastYear );
+    unsigned int caesarsHelper = _city()->funds().getIssueValue( city::Funds::caesarsHelp, city::Funds::thisYear );
+    caesarsHelper += _city()->funds().getIssueValue( city::Funds::caesarsHelp, city::Funds::lastYear );
     if( caesarsHelper > 0 )
       _d->prosperityExtend += -10;
   }

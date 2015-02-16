@@ -13,14 +13,14 @@
 // You should have received a copy of the GNU General Public License
 // along with CaesarIA.  If not, see <http://www.gnu.org/licenses/>.
 //
-// Copyright 2012-2014 Dalerank, dalerankn8@gmail.com
+// Copyright 2012-2015 Dalerank, dalerankn8@gmail.com
 
 #include "empire.hpp"
 #include "computer_city.hpp"
 #include "core/variant.hpp"
 #include "core/time.hpp"
 #include "core/saveadapter.hpp"
-#include "core/stringhelper.hpp"
+#include "core/utils.hpp"
 #include "trading.hpp"
 #include "core/foreach.hpp"
 #include "core/logger.hpp"
@@ -36,6 +36,7 @@
 #include "game/gamedate.hpp"
 #include "city/funds.hpp"
 #include "barbarian.hpp"
+#include "events/changeemperor.hpp"
 
 namespace world
 {
@@ -46,6 +47,7 @@ public:
   CityList cities;
   Trading trading;
   EmpireMap emap;
+  ObjectList newObjects;
   ObjectList objects;
   int rateInterest;
   Emperor emperor;
@@ -61,6 +63,7 @@ public:
   void takeTaxes();
   void checkLoans();
   void checkBarbarians(EmpirePtr empire);
+  void checkEmperorChanged();
 };
 
 Empire::Empire() : _d( new Impl )
@@ -87,12 +90,14 @@ CityList Empire::cities() const
   return ret;
 }
 
-Empire::~Empire(){}
+Empire::~Empire()
+{
+}
 
 void Empire::_initializeObjects( vfs::Path filename )
 {
   _d->objects.clear();
-  VariantMap objects = SaveAdapter::load( filename.toString() );
+  VariantMap objects = config::load( filename.toString() );
   if( objects.empty() )
   {
     Logger::warning( "Empire: can't load objects model from %s", filename.toString().c_str() );
@@ -103,7 +108,7 @@ void Empire::_initializeObjects( vfs::Path filename )
 
 void Empire::_initializeCities( vfs::Path filename )
 {
-  VariantMap cities = SaveAdapter::load( filename.toString() );
+  VariantMap cities = config::load( filename.toString() );
 
   _d->cities.clear();
   if( cities.empty() )
@@ -123,7 +128,7 @@ void Empire::_initializeCities( vfs::Path filename )
 
 void Empire::initialize(vfs::Path citiesPath, vfs::Path objectsPath, vfs::Path filemap)
 {
-  VariantMap emap = SaveAdapter::load( filemap.toString() );
+  VariantMap emap = config::load( filemap.toString() );
   _d->emap.initialize( emap );
 
   _initializeCities( citiesPath );
@@ -146,10 +151,20 @@ void Empire::initialize(vfs::Path citiesPath, vfs::Path objectsPath, vfs::Path f
 void Empire::addObject(ObjectPtr obj)
 {
   if( obj->name().empty() )
+  {          
+    obj->setName( obj->type() + utils::i2str( _d->objUid++ ) );    
+  }  
+
+  foreach( it, _d->objects )
   {
-    obj->setName( obj->type() + StringHelper::i2str( _d->objUid++ ) );
-    _d->objects.push_back( obj );
+    if( *it == obj )
+    {
+      Logger::warning( "WARNING!!! Empire:addObject also have object with name " + obj->name() );
+      return;
+    }
   }
+
+  _d->newObjects.push_back( obj );
 }
 
 CityPtr Empire::addCity( CityPtr city )
@@ -239,6 +254,7 @@ void Empire::load( const VariantMap& stream )
   VARIANT_LOAD_ANYDEF_D( _d, objUid, _d->objUid, stream )
   VARIANT_LOAD_ANYDEF_D( _d, enabled, _d->enabled, stream )
   VARIANT_LOAD_ANYDEF_D( _d, maxBarbariansGroups, _d->maxBarbariansGroups, stream )
+  VARIANT_LOAD_ANYDEF_D( _d, workerSalary, _d->workerSalary, stream )
   VARIANT_LOAD_ANYDEF_D( _d, rateInterest, _d->rateInterest, stream )
 
   _d->trading.load( stream.get( "trade").toMap() );
@@ -255,6 +271,8 @@ void Empire::load( const VariantMap& stream )
 
   VariantMap objects = stream.get( "objects" ).toMap();
   _loadObjects( objects );
+  _d->emperor.load( stream.get( "emperor" ).toMap() ); //path from keeeeper
+  _d->emperor.checkCities();
 }
 
 void Empire::setCitiesAvailable(bool value)
@@ -263,10 +281,12 @@ void Empire::setCitiesAvailable(bool value)
 }
 
 unsigned int Empire::workerSalary() const {  return _d->workerSalary; }
+void Empire::setWorkerSalary(unsigned int value){ _d->workerSalary = math::clamp<unsigned int>( value, 10, 50); }
+
 bool Empire::isAvailable() const{  return _d->enabled; }
 void Empire::setAvailable(bool value) { _d->enabled = value; }
 
-void Empire::setPrice(Good::Type gtype, int buy, int sell)
+void Empire::setPrice(good::Product gtype, int buy, int sell)
 {
   _d->trading.setPrice( gtype, buy, sell );
   foreach( it, _d->cities)
@@ -275,16 +295,21 @@ void Empire::setPrice(Good::Type gtype, int buy, int sell)
   }
 }
 
-void Empire::changePrice(Good::Type gtype, int buy, int sell)
+void Empire::changePrice(good::Product gtype, int buy, int sell)
 {
   int b, s;
   _d->trading.getPrice( gtype, b, s );
   setPrice( gtype, b + buy, s + sell );
 }
 
-void Empire::getPrice(Good::Type gtype, int& buy, int& sell) const
+void Empire::getPrice(good::Product gtype, int& buy, int& sell) const
 {
   _d->trading.getPrice( gtype, buy, sell );
+}
+
+void Empire::clear()
+{
+
 }
 
 TraderoutePtr Empire::createTradeRoute(std::string start, std::string stop )
@@ -365,13 +390,20 @@ void Empire::timeStep( unsigned int time )
     else { ++it; }
   }
 
-  if( GameDate::isMonthChanged() )
+  if( !_d->newObjects.empty() )
+  {
+    _d->objects << _d->newObjects;
+    _d->newObjects.clear();
+  }
+
+  if( game::Date::isMonthChanged() )
   {
     _d->checkLoans();
     _d->checkBarbarians( this );
+    _d->checkEmperorChanged();
   }
 
-  if( GameDate::isYearChanged() )
+  if( game::Date::isYearChanged() )
   {
     _d->takeTaxes();
   }
@@ -398,11 +430,11 @@ CityPtr Empire::initPlayerCity( CityPtr city )
   _d->cities.push_back( city );
   _d->playerCityName = city->name();
 
-  for( int k=Good::none; k < Good::goodCount; k++ )
+  for( good::Product k=good::none; k < good::goodCount; ++k )
   {
     int buy, sell;
-    getPrice( Good::Type(k), buy, sell );
-    city->empirePricesChanged( Good::Type(k), buy, sell );
+    getPrice( k, buy, sell );
+    city->empirePricesChanged( k, buy, sell );
   }
 
   return ret;
@@ -487,7 +519,7 @@ GovernorRanks EmpireHelper::ranks()
 {
   std::map<unsigned int, GovernorRank> sortRanks;
 
-  VariantMap vm = SaveAdapter::load( SETTINGS_RC_PATH( ranksModel ) );
+  VariantMap vm = config::load( SETTINGS_RC_PATH( ranksModel ) );
   foreach( i, vm )
   {
     GovernorRank rank;
@@ -544,20 +576,34 @@ void Empire::Impl::checkBarbarians( EmpirePtr empire )
 
   if( barbarians.size() < maxBarbariansGroups )
   {
-    BarbarianPtr brb = Barbarian::create( empire, Point( 1000, 0 ) );
+    BarbarianPtr brb = Barbarian::create( empire, Point( 1500, 100 ) );
     empire->addObject( ptr_cast<Object>( brb ) );
+  }
+}
+
+void Empire::Impl::checkEmperorChanged()
+{
+  EmperorLine& emperors = EmperorLine::instance();
+  std::string emperorName = emperors.getEmperor( game::Date::current() );
+  if( emperorName != emperor.name() )
+  {
+    VariantMap vm = emperors.getInfo( emperorName );
+
+    events::GameEventPtr e = events::ChangeEmperor::create();
+    e->load( vm );
+    e->dispatch();
   }
 }
 
 void Empire::Impl::takeTaxes()
 {
-  foreach( it, cities)
+  foreach( it, cities )
   {
     CityPtr city = *it;
 
     int empireTax = 0;
 
-    if( is_kind_of<Rome>( city ) )
+    if( is_kind_of<Rome>( city ) || city->age() < 2 )
     {
       continue;
     }
@@ -591,15 +637,6 @@ void Empire::Impl::takeTaxes()
     }
     else
     {
-      int lastYearBrokenTribute = funds.getIssueValue( city::Funds::overdueEmpireTax, city::Funds::lastYear );
-
-      std::string text = lastYearBrokenTribute > 0
-                                ? "##for_second_year_broke_tribute##"
-                                : "##current_year_notpay_tribute_warning##";
-      events::GameEventPtr e = events::ShowInfobox::create( "##tribute_broken_title##",
-                                                            text );
-      e->dispatch();
-
       city->funds().resolveIssue( FundIssue( city::Funds::overdueEmpireTax, empireTax ) );
     }
   }

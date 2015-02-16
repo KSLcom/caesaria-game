@@ -51,7 +51,7 @@ class CitizenInfoboxParser : public InfoboxCreator
 public:
   gui::infobox::Simple* create( PlayerCityPtr city, gui::Widget* parent, TilePos pos )
   {
-    WalkerList walkers = city->walkers( walker::any, pos );
+    WalkerList walkers = city->walkers( pos );
     
     if( walkers.empty() )
     {
@@ -82,9 +82,9 @@ PManager& PManager::instance()
 
 void PManager::loadInfoboxes( Manager& manager)
 {
-  manager.addInfobox( construction::road,         CAESARIA_STR_EXT(Road),   new CitizenInfoboxParser<AboutLand>() );
-  manager.addInfobox( construction::plaza,        CAESARIA_STR_EXT(Plaza),  new CitizenInfoboxParser<AboutLand>() );
-  manager.addInfobox( building::unknown,          CAESARIA_STR_EXT(unknown), new CitizenInfoboxParser<AboutLand>() );
+  manager.addInfobox( objects::road,         CAESARIA_STR_EXT(Road),   new CitizenInfoboxParser<AboutLand>() );
+  manager.addInfobox( objects::plaza,        CAESARIA_STR_EXT(Plaza),  new CitizenInfoboxParser<AboutLand>() );
+  manager.addInfobox( objects::unknown,      CAESARIA_STR_EXT(unknown), new CitizenInfoboxParser<AboutLand>() );
 
   addCreator( walker::patrolPoint, new SpecificCitizenInfoboxCreator<AboutLegion>() );
 }
@@ -105,7 +105,7 @@ void PManager::addCreator( constants::walker::Type type, CreatorPtr c)
 
 Simple* PManager::show( gui::Widget* parent, PlayerCityPtr city, const TilePos& pos )
 {
-  WalkerList walkers = city->walkers( walker::any, pos );
+  WalkerList walkers = city->walkers( pos );
   Impl::Creators::iterator it = _d->creators.find( walkers.empty() ? walker::unknown : walkers.front()->type() );
   if( it == _d->creators.end() )
   {

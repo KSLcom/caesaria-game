@@ -26,8 +26,11 @@
 #include "pathway/pathway.hpp"
 #include "city/helper.hpp"
 #include "walker/fishing_boat.hpp"
+#include "objects_factory.hpp"
 
 using namespace constants;
+
+REGISTER_CLASS_IN_OVERLAYFACTORY(objects::shipyard, Shipyard)
 
 class Shipyard::Impl
 {
@@ -42,7 +45,7 @@ public:
   WharfPtr findFreeWharf( PlayerCityPtr city );
 };
 
-Shipyard::Shipyard() : CoastalFactory(Good::timber, Good::none, building::shipyard, Size(2)),
+Shipyard::Shipyard() : CoastalFactory(good::timber, good::none, objects::shipyard, Size(2)),
   _d( new Impl )
 {
   // transport 1 2 3 4
@@ -66,7 +69,7 @@ void Shipyard::destroy()
 void Shipyard::timeStep(const unsigned long time)
 {
   //try get good from storage building for us
-  if( GameDate::isWeekChanged() )
+  if( game::Date::isWeekChanged() )
   {
     if( numberWorkers() > 0 && walkers().size() == 0 )
     {
@@ -151,7 +154,7 @@ WharfPtr Shipyard::Impl::findFreeWharf( PlayerCityPtr city )
 {
   city::Helper helper( city );
 
-  WharfList wharfs = helper.find<Wharf>( building::wharf );
+  WharfList wharfs = helper.find<Wharf>( objects::wharf );
   foreach( wharf, wharfs )
   {
     if( (*wharf)->getBoat().isNull() )

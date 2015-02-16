@@ -29,7 +29,7 @@
 #include "statistic.hpp"
 #include "events/showinfobox.hpp"
 #include "core/saveadapter.hpp"
-#include <map>
+#include "core/variant_map.hpp"
 
 using namespace constants;
 using namespace std;
@@ -59,13 +59,13 @@ public:
 
 public:
   void fillIndustryMap();
-  bool haveRecruter( WorkingBuildingPtr building );
+  bool haveRecruter( WorkingBuildingPtr objects );
   void hireWorkers( PlayerCityPtr city, WorkingBuildingPtr bld );
 };
 
-SrvcPtr WorkersHire::create(PlayerCityPtr city )
+SrvcPtr WorkersHire::create( PlayerCityPtr city )
 {
-  SrvcPtr ret( new WorkersHire( city ));
+  SrvcPtr ret( new WorkersHire( city ) );
   ret->drop();
 
   return ret;
@@ -73,15 +73,15 @@ SrvcPtr WorkersHire::create(PlayerCityPtr city )
 
 std::string WorkersHire::defaultName(){ return CAESARIA_STR_EXT(WorkersHire); }
 
-WorkersHire::WorkersHire(PlayerCityPtr city )
-  : Srvc( *city.object(), WorkersHire::defaultName() ), _d( new Impl )
+WorkersHire::WorkersHire(PlayerCityPtr city)
+  : Srvc( city, WorkersHire::defaultName() ), _d( new Impl )
 {
-  _d->lastMessageDate = GameDate::current();
-  _d->excludeTypes.insert( building::fountain );
+  _d->lastMessageDate = game::Date::current();
+  _d->excludeTypes.insert( objects::fountain );
   _d->fillIndustryMap();
   _d->distance = defaultHireDistance;
 
-  load( SaveAdapter::load( ":workershire.model" ) );
+  load( config::load( ":workershire.model" ) );
 }
 
 void WorkersHire::Impl::fillIndustryMap()
@@ -137,24 +137,24 @@ void WorkersHire::Impl::hireWorkers(PlayerCityPtr city, WorkingBuildingPtr bld)
   }
 }
 
-void WorkersHire::update( const unsigned int time )
+void WorkersHire::timeStep( const unsigned int time )
 {
-  if( !GameDate::isWeekChanged() )
+  if( !game::Date::isWeekChanged() )
     return;
 
-  if( _city.population() == 0 )
+  if( _city()->population() == 0 )
     return;
 
-  _d->hrInCity = _city.walkers( walker::recruter );
+  _d->hrInCity = _city()->walkers( walker::recruter );
 
-  city::Helper helper( &_city );
-  WorkingBuildingList buildings = helper.find< WorkingBuilding >( building::any );
+  city::Helper helper( _city() );
+  WorkingBuildingList buildings = helper.find< WorkingBuilding >( objects::any );
 
   if( !_d->priorities.empty() )
   {
     foreach( hireIt, _d->priorities )
     {
-      Industry::BuildingGroups groups = city::Industry::toGroups( *hireIt );
+      industry::BuildingGroups groups = industry::toGroups( *hireIt );
 
       foreach( grIt, groups )
       {
@@ -162,7 +162,7 @@ void WorkersHire::update( const unsigned int time )
         {
           if( (*it)->group() == *grIt )
           {
-            _d->hireWorkers( &_city, *it );
+            _d->hireWorkers( _city(), *it );
             it = buildings.erase( it );
           }
           else { ++it; }
@@ -173,14 +173,14 @@ void WorkersHire::update( const unsigned int time )
 
   foreach( it, buildings )
   {    
-    _d->hireWorkers( &_city, *it );
+    _d->hireWorkers( _city(), *it );
   }
 
-  if( _d->lastMessageDate.monthsTo( GameDate::current() ) > DateTime::monthsInYear / 2 )
+  if( _d->lastMessageDate.monthsTo( game::Date::current() ) > DateTime::monthsInYear / 2 )
   {
-    _d->lastMessageDate = GameDate::current();
+    _d->lastMessageDate = game::Date::current();
 
-    int workersNeed = Statistic::getWorkersNeed( &_city );
+    int workersNeed = statistic::getWorkersNeed( _city() );
     if( workersNeed > 20 )
     {
       events::GameEventPtr e = events::ShowInfobox::create( "##city_need_workers_title##", "##city_need_workers_text##",
@@ -192,7 +192,7 @@ void WorkersHire::update( const unsigned int time )
 
 void WorkersHire::setRecruterDistance(const unsigned int distance) {  _d->distance = distance; }
 
-void WorkersHire::setIndustryPriority(Industry::Type industry, int priority)
+void WorkersHire::setIndustryPriority(industry::Type industry, int priority)
 {
   foreach( i, _d->priorities )
   {
@@ -211,7 +211,7 @@ void WorkersHire::setIndustryPriority(Industry::Type industry, int priority)
   }
 }
 
-int WorkersHire::getPriority(Industry::Type industry)
+int WorkersHire::getPriority(industry::Type industry)
 {
   foreach( i, _d->priorities )
   {

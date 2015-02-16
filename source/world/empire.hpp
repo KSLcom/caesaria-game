@@ -33,6 +33,7 @@ class Empire : public ReferenceCounted, public Serializable
 public:
   static EmpirePtr create();
   virtual ~Empire();
+
   CityList cities() const;
 
   CityPtr findCity( const std::string& name ) const;
@@ -64,13 +65,16 @@ public:
 
   void setCitiesAvailable( bool value );
   unsigned int workerSalary() const;
+  void setWorkerSalary( unsigned int value );
+
   bool isAvailable() const;
   void setAvailable( bool value );
 
-  void setPrice( Good::Type gtype, int buy, int sell );
-  void changePrice( Good::Type gtype, int buy, int sell );
-  void getPrice( Good::Type gtype, int& buy, int& sell ) const;
+  void setPrice( good::Product gtype, int buy, int sell );
+  void changePrice( good::Product gtype, int buy, int sell );
+  void getPrice( good::Product gtype, int& buy, int& sell ) const;
 
+  void clear();
 private:
   Empire();
   void _loadObjects(const VariantMap& objects );

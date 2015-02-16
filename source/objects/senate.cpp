@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU General Public License
 // along with CaesarIA.  If not, see <http://www.gnu.org/licenses/>.
 //
-// Copyright 2012-2014 Dalerank, dalerankn8@gmail.com
+// Copyright 2012-2015 Dalerank, dalerankn8@gmail.com
 
 
 #include "senate.hpp"
@@ -27,12 +27,12 @@
 #include "core/gettext.hpp"
 #include "game/gamedate.hpp"
 #include "core/logger.hpp"
+#include "objects_factory.hpp"
 
 using namespace constants;
 using namespace gfx;
-// govt 4  - senate
-// govt 9  - advanced senate
-// govt 5 ~ 8 - senate flags
+
+REGISTER_CLASS_IN_OVERLAYFACTORY(objects::senate, Senate)
 
 class Senate::Impl
 {
@@ -41,7 +41,7 @@ public:
   std::string errorStr;
 };
 
-Senate::Senate() : ServiceBuilding( Service::senate, building::senate, Size(5) ), _d( new Impl )
+Senate::Senate() : ServiceBuilding( Service::senate, objects::senate, Size(5) ), _d( new Impl )
 {
   setPicture( ResourceGroup::govt, 4 );
   _d->taxValue = 0;
@@ -57,15 +57,15 @@ Senate::Senate() : ServiceBuilding( Service::senate, building::senate, Size(5) )
   _fgPicturesRef()[ 3 ].setOffset( 230, -10 );
 }
 
-bool Senate::canBuild( PlayerCityPtr city, TilePos pos, const TilesArray& aroundTiles ) const
+bool Senate::canBuild( const CityAreaInfo& areaInfo ) const
 {
   _d->errorStr = "";
-  bool mayBuild = ServiceBuilding::canBuild( city, pos, aroundTiles );
+  bool mayBuild = ServiceBuilding::canBuild( areaInfo );
 
   if( mayBuild )
   {
-    city::Helper helper( city );
-    bool isSenatePresent = !helper.find<Building>(building::senate).empty();
+    city::Helper helper( areaInfo.city );
+    bool isSenatePresent = !helper.find<Building>(objects::senate).empty();
     _d->errorStr = isSenatePresent ? _("##can_build_only_one_of_building##") : "";
     mayBuild &= !isSenatePresent;
   }
@@ -96,9 +96,9 @@ void Senate::applyService(ServiceWalkerPtr walker)
   ServiceBuilding::applyService( walker );
 }
 
-bool Senate::build(PlayerCityPtr city, const TilePos& pos)
+bool Senate::build( const CityAreaInfo& info )
 {
-  ServiceBuilding::build( city, pos );
+  ServiceBuilding::build( info );
   _updateUnemployers();
   _updateRatings();
 
@@ -117,7 +117,7 @@ void Senate::_updateRatings()
 
 void Senate::timeStep(const unsigned long time)
 {
-  if( GameDate::isMonthChanged() )
+  if( game::Date::isMonthChanged() )
   {
     _updateUnemployers();
     _updateRatings();
@@ -144,8 +144,13 @@ void Senate::_updateUnemployers()
 
 float Senate::collectTaxes()
 {
-  float save = _d->taxValue;
-  _d->taxValue = 0;
+  int save = 0;
+
+  if( _d->taxValue > 1 )
+  {
+    save = floor( _d->taxValue );
+    _d->taxValue -= save;
+  }
   return save;
 }
 
@@ -156,7 +161,7 @@ int Senate::status(Senate::Status status) const
 {
   switch(status)
   {
-  case workless: return city::Statistic::getWorklessPercent( _city() );
+  case workless: return city::statistic::getWorklessPercent( _city() );
   case culture: return _city()->culture();
   case prosperity: return _city()->prosperity();
   case peace: return _city()->peace();

@@ -19,8 +19,9 @@
 #include "objects/construction.hpp"
 #include "city/helper.hpp"
 #include "core/safetycast.hpp"
-#include "core/stringhelper.hpp"
+#include "core/utils.hpp"
 #include "core/position.hpp"
+#include "core/variant_map.hpp"
 #include "walker/fish_place.hpp"
 #include "game/gamedate.hpp"
 
@@ -52,27 +53,27 @@ SrvcPtr Fishery::create( PlayerCityPtr city )
 std::string Fishery::defaultName() {  return CAESARIA_STR_EXT(Fishery);}
 
 Fishery::Fishery( PlayerCityPtr city )
-  : Srvc( *city.object(), Fishery::defaultName() ), _d( new Impl )
+  : Srvc( city, Fishery::defaultName() ), _d( new Impl )
 {
   _d->failedCounter = 0;
   _d->maxFishPlace = 1;
 }
 
-void Fishery::update( const unsigned int time )
+void Fishery::timeStep(const unsigned int time )
 {  
-  if( !GameDate::isMonthChanged() )
+  if( !game::Date::isMonthChanged() )
     return;
 
   if( _d->places.empty() )
   {
-    Helper helper( &_city );
+    Helper helper( _city() );
     _d->places = helper.find<FishPlace>( walker::fishPlace, TilePos(-1, -1) );
   }
 
   while( _d->places.size() < _d->maxFishPlace )
   {
-    FishPlacePtr fishplace = FishPlace::create( &_city );
-    TilePos travelingPoint = _city.borderInfo().boatExit;
+    FishPlacePtr fishplace = FishPlace::create( _city() );
+    TilePos travelingPoint = _city()->borderInfo().boatExit;
     if( !_d->locations.empty() )
     {
       travelingPoint = _d->locations.size() > 1
@@ -80,7 +81,7 @@ void Fishery::update( const unsigned int time )
                          : _d->locations.front();
     }
 
-    fishplace->send2city( _city.borderInfo().boatEntry, travelingPoint );
+    fishplace->send2city( _city()->borderInfo().boatEntry, travelingPoint );
 
     if( fishplace->isDeleted() )
     {
@@ -125,7 +126,7 @@ VariantMap Fishery::save() const
   int index = 0;
   foreach( it, _d->locations )
   {
-    locationsVm[ StringHelper::format( 0xff, "fp_%d", index++ ) ] = *it;
+    locationsVm[ utils::format( 0xff, "fp_%d", index++ ) ] = *it;
   }
 
   ret[ "locations" ] = locationsVm;

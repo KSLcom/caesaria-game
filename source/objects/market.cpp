@@ -19,27 +19,31 @@
 #include "gfx/picture.hpp"
 #include "game/resourcegroup.hpp"
 #include "walker/market_buyer.hpp"
-#include "core/variant.hpp"
+#include "core/variant_map.hpp"
 #include "good/goodstore_simple.hpp"
 #include "city/city.hpp"
 #include "walker/serviceman.hpp"
 #include "objects/constants.hpp"
 #include "game/gamedate.hpp"
 #include "walker/helper.hpp"
+#include "objects_factory.hpp"
 
 using namespace gfx;
+using namespace constants;
+
+REGISTER_CLASS_IN_OVERLAYFACTORY(objects::market, Market)
 
 class Market::Impl
 {
 public:
-  SimpleGoodStore goodStore;
+  good::SimpleStore store;
 
   bool isAnyGoodStored()
   {
     bool anyGoodStored = false;
-    for( int i = 0; i < Good::goodCount; ++i)
+    for( good::Product i = good::none; i < good::goodCount; ++i)
     {
-      anyGoodStored |= ( goodStore.qty( Good::Type(i) ) >= 100 );
+      anyGoodStored |= ( store.qty( i ) >= 100 );
     }
 
     return anyGoodStored;
@@ -47,20 +51,20 @@ public:
 
   void initStore()
   {
-    goodStore.setCapacity(5000);
-    goodStore.setCapacity(Good::wheat, 800);
-    goodStore.setCapacity(Good::fish, 600);
-    goodStore.setCapacity(Good::fruit, 600);
-    goodStore.setCapacity(Good::meat, 600);
-    goodStore.setCapacity(Good::vegetable, 600);
-    goodStore.setCapacity(Good::pottery, 250);
-    goodStore.setCapacity(Good::furniture, 250);
-    goodStore.setCapacity(Good::oil, 250);
-    goodStore.setCapacity(Good::wine, 250);
+    store.setCapacity(5000);
+    store.setCapacity(good::wheat, 800);
+    store.setCapacity(good::fish, 600);
+    store.setCapacity(good::fruit, 600);
+    store.setCapacity(good::meat, 600);
+    store.setCapacity(good::vegetable, 600);
+    store.setCapacity(good::pottery, 250);
+    store.setCapacity(good::furniture, 250);
+    store.setCapacity(good::oil, 250);
+    store.setCapacity(good::wine, 250);
   }
 };
 
-Market::Market() : ServiceBuilding(Service::market, constants::building::market, Size(2) ),
+Market::Market() : ServiceBuilding(Service::market, constants::objects::market, Size(2) ),
   _d( new Impl )
 {
   _fgPicturesRef().resize(1);  // animation
@@ -90,19 +94,18 @@ void Market::deliverService()
 }
 
 unsigned int Market::walkerDistance() const {  return 26; }
-GoodStore& Market::goodStore(){  return _d->goodStore; }
+good::Store &Market::goodStore(){  return _d->store; }
 
-std::list<Good::Type> Market::mostNeededGoods()
+std::list<good::Product> Market::mostNeededGoods()
 {
-  std::list<Good::Type> res;
+  std::list<good::Product> res;
 
-  std::multimap<float, Good::Type> mapGoods;  // ordered by demand
+  std::multimap<float, good::Product> mapGoods;  // ordered by demand
 
-  for (int n = 0; n < Good::goodCount; ++n)
+  for( good::Product goodType = good::none; goodType < good::goodCount; ++goodType)
   {
     // for all types of good
-    Good::Type goodType = (Good::Type) n;
-    GoodStock &stock = _d->goodStore.getStock(goodType);
+    good::Stock &stock = _d->store.getStock(goodType);
     int demand = stock.capacity() - stock.qty();
     if (demand > 200)
     {
@@ -110,9 +113,9 @@ std::list<Good::Type> Market::mostNeededGoods()
     }
   }
 
-  for( std::multimap<float, Good::Type>::iterator itMap = mapGoods.begin(); itMap != mapGoods.end(); ++itMap)
+  for( std::multimap<float, good::Product>::iterator itMap = mapGoods.begin(); itMap != mapGoods.end(); ++itMap)
   {
-    Good::Type goodType = itMap->second;
+    good::Product goodType = itMap->second;
     res.push_back(goodType);
   }
 
@@ -120,10 +123,10 @@ std::list<Good::Type> Market::mostNeededGoods()
 }
 
 
-int Market::getGoodDemand(const Good::Type &goodType)
+int Market::getGoodDemand(const good::Product &goodType)
 {
   int res = 0;
-  GoodStock &stock = _d->goodStore.getStock(goodType);
+  good::Stock &stock = _d->store.getStock(goodType);
   res = stock.capacity() - stock.qty();
   res = (res/100)*100;  // round at the lowest century
   return res;
@@ -132,25 +135,25 @@ int Market::getGoodDemand(const Good::Type &goodType)
 void Market::save( VariantMap& stream) const 
 {
   ServiceBuilding::save( stream );
-  stream[ "goodStore" ] = _d->goodStore.save();
+  stream[ "goodStore" ] = _d->store.save();
 }
 
 void Market::load( const VariantMap& stream)
 {
   ServiceBuilding::load( stream );
 
-  _d->goodStore.load( stream.get( "goodStore" ).toMap() );
+  _d->store.load( stream.get( "goodStore" ).toMap() );
 
   _d->initStore();
 }
 
 void Market::timeStep(const unsigned long time)
 {
-  if( GameDate::isWeekChanged() )
+  if( game::Date::isWeekChanged() )
   {
     ServiceWalkerList servicemen;
     servicemen << walkers();
-    if( servicemen.size() > 0 && _d->goodStore.qty() == 0 )
+    if( servicemen.size() > 0 && _d->store.qty() == 0 )
     {
       servicemen.front()->return2Base();
     }

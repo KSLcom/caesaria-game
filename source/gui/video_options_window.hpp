@@ -25,18 +25,21 @@
 namespace gui
 {
 
-class VideoOptionsWindow : public Window
+namespace dialog
+{
+
+class VideoOptions : public Window
 {
 public:
-  VideoOptionsWindow( Widget* parent,
-                      gfx::Engine::Modes modes,
-                      bool fullscreen );
+  VideoOptions( Widget* parent,
+                gfx::Engine::Modes modes,
+                bool fullscreen );
 
   //! Деструктор
-  virtual ~VideoOptionsWindow(void);
+  virtual ~VideoOptions(void);
   virtual bool onEvent(const NEvent &event);
 
-public oc3_signals:
+public:
   Signal1<Size>& onSreenSizeChange();
   Signal1<bool>& onFullScreenChange();
   Signal0<>& onClose();
@@ -48,6 +51,8 @@ private:
   ScopedPtr< Impl > _d;
 };
 
-} //end namespace gui
+}//end namespace dialog
+
+}//end namespace gui
 
 #endif //_CAESARIA_WINDOW_VIDEO_OPTIONS_H_INCLUDE_

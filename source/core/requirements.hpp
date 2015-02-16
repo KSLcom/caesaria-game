@@ -21,8 +21,8 @@
 #include "version.hpp"
 #include "platform.hpp"
 
-//see CMakeLists.txt for this define
-//#define NO_USE_SYSTEM_ZLIB
+#define CAESARIA_STR_EXT(__A) #__A
+#define CAESARIA_STR_A(__A) CAESARIA_STR_EXT(__A)
 
 #if defined(CAESARIA_PLATFORM_WIN)
   // alignment of a member was sensitive to packing
@@ -35,12 +35,6 @@
     #define _CRT_SECURE_NO_DEPRECATE
   #endif
 #endif
-
-/*#if defined(CAESARIA_PLATFORM_UNIX)
-  #ifdef __GNUC__
-    #define CAESARIA_COMPILER_NAME "gcc"
-  #endif
-#endif*/
 
 #ifndef CAESARIA_COMPILER_NAME
   #define CAESARIA_COMPILER_NAME "unknown"
@@ -56,8 +50,10 @@
         #undef CAESARIA_USE_MINGW_COMPILER
         #if defined(CAESARIA_PLATFORM_WIN64) // using portable common solution for x64 configuration
           #include <crtdbg.h>
+          #include <cassert>
           #define _CAESARIA_DEBUG_BREAK_IF( _CONDITION_ ) if (_CONDITION_) {_CrtDbgBreak();}
         #else
+          #include <cassert>
           #define _CAESARIA_DEBUG_BREAK_IF( _CONDITION_ ) if (_CONDITION_) {_asm int 3}
         #endif
       #else

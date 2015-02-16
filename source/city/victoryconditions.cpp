@@ -17,7 +17,7 @@
 
 #include "victoryconditions.hpp"
 #include "objects/house_level.hpp"
-#include "core/variant.hpp"
+#include "core/variant_map.hpp"
 
 namespace city
 {
@@ -31,15 +31,17 @@ public:
   int prosperity;
   int favour;
   int peace;
+  bool may_continue;
   bool success;
+  int reignYears;
+  DateTime finishDate;
   StringArray overview;
+
   std::string shortDesc,
               caption,
               next,
               title,
               winText;
-
-
 };
 
 VictoryConditions::VictoryConditions() : _d( new Impl )
@@ -50,16 +52,22 @@ VictoryConditions::VictoryConditions() : _d( new Impl )
   _d->culture = 0;
   _d->prosperity = 0;
   _d->favour = 0;
+  _d->may_continue = false;
   _d->peace = 0;
+  _d->reignYears = 0;
+  _d->finishDate = DateTime( 500, 1, 1 );
 }
 
 VictoryConditions::~VictoryConditions(){}
 
 bool VictoryConditions::isSuccess( int culture, int prosperity,
-                                int favour, int peace,
-                                int population ) const
+                                   int favour, int peace,
+                                   int population ) const
 {
   if( (_d->population + _d->culture + _d->prosperity + _d->favour + _d->peace) == 0 )
+    return false;
+
+  if( _d->reignYears > 0 )
     return false;
 
   _d->success = (_d->population <= population &&
@@ -68,6 +76,9 @@ bool VictoryConditions::isSuccess( int culture, int prosperity,
 
   return _d->success;
 }
+
+bool VictoryConditions::isSuccess() const {  return _d->success; }
+bool VictoryConditions::mayContinue() const { return _d->may_continue; }
 
 void VictoryConditions::load( const VariantMap& stream )
 {
@@ -78,6 +89,14 @@ void VictoryConditions::load( const VariantMap& stream )
   VARIANT_LOAD_ANY_D( _d, prosperity, stream )
   VARIANT_LOAD_ANY_D( _d, favour, stream )
   VARIANT_LOAD_ANY_D( _d, peace, stream )
+  VARIANT_LOAD_TIME_D( _d, finishDate, stream )
+  VARIANT_LOAD_ANY_D( _d, reignYears, stream )
+  VARIANT_LOAD_ANY_D( _d, may_continue, stream )
+  if( _d->finishDate.year() < -9000 )
+  {
+    _d->finishDate = DateTime( 500, 1, 1 );
+  }
+
   _d->overview = stream.get( "overview" ).toStringArray();
   _d->shortDesc = stream.get( "short" ).toString();
   _d->winText = stream.get( "win.text" ).toString();
@@ -96,15 +115,18 @@ VariantMap VictoryConditions::save() const
   VARIANT_SAVE_ANY_D( ret, _d, favour )
   VARIANT_SAVE_ANY_D( ret, _d, peace )
   VARIANT_SAVE_STR_D( ret, _d, overview )
+  VARIANT_SAVE_ANY_D( ret, _d, finishDate )
+  VARIANT_SAVE_ANY_D( ret, _d, reignYears )
   ret[ "short"      ] = Variant( _d->shortDesc );
   ret[ "win.text"   ] = Variant( _d->winText );
   VARIANT_SAVE_STR_D( ret, _d, caption )
+  VARIANT_SAVE_STR_D( ret, _d, may_continue )
   VARIANT_SAVE_STR_D( ret, _d, next )
   VARIANT_SAVE_STR_D( ret, _d, title )
   return ret;
 }
 
-VictoryConditions&VictoryConditions::operator=(const VictoryConditions& a)
+VictoryConditions& VictoryConditions::operator=(const VictoryConditions& a)
 {
   _d->maxHouseLevel = a._d->maxHouseLevel;
   _d->success = a._d->success;
@@ -118,7 +140,9 @@ VictoryConditions&VictoryConditions::operator=(const VictoryConditions& a)
   _d->caption = a._d->caption;
   _d->next = a._d->next;
   _d->title = a._d->title;
+  _d->finishDate = a._d->finishDate;
   _d->winText = a._d->winText;
+  _d->reignYears = a._d->reignYears;
 
   return *this;
 }
@@ -127,11 +151,14 @@ int VictoryConditions::needCulture() const{  return _d->culture;}
 int VictoryConditions::needProsperity() const{  return _d->prosperity;}
 int VictoryConditions::needFavour() const{  return _d->favour;}
 int VictoryConditions::needPeace() const{  return _d->peace;}
+const DateTime &VictoryConditions::finishDate() const { return _d->finishDate; }
 std::string VictoryConditions::shortDesc() const {  return _d->shortDesc;}
 std::string VictoryConditions::nextMission() const { return _d->next; }
 std::string VictoryConditions::newTitle() const { return _d->title; }
 std::string VictoryConditions::winText() const{ return _d->winText; }
 int VictoryConditions::needPopulation() const{  return _d->population;}
 const StringArray& VictoryConditions::overview() const{  return _d->overview;}
+void VictoryConditions::addReignYears(int value){  _d->reignYears += value;}
+void VictoryConditions::decreaseReignYear(){ _d->reignYears = std::max<int>( _d->reignYears-1, 0); }
 
 }//end namespace city

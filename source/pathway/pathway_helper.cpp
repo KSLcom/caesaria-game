@@ -35,7 +35,7 @@ Pathway PathwayHelper::create( TilePos startPos, TilePos stopPos, WayType type/*
     Pathway ret = p.getPath( startPos, stopPos, Pathfinder::roadOnly );
     if( !ret.isValid() )
     {
-      ret = p.getPath( startPos, stopPos, Pathfinder::roadOnly );
+      ret = p.getPath( startPos, stopPos, Pathfinder::terrainOnly );
     }
 
     return ret;
@@ -108,7 +108,7 @@ Pathway PathwayHelper::create(TilePos startPos, TilePos stopPos, const TilePossi
   return Pathfinder::instance().getPath( startPos, stopPos, Pathfinder::customCondition );
 }
 
-DirectRoute PathwayHelper::shortWay(PlayerCityPtr city, TilePos startPos, constants::building::Type buildingType, PathwayHelper::WayType type)
+DirectRoute PathwayHelper::shortWay(PlayerCityPtr city, TilePos startPos, constants::objects::Type buildingType, PathwayHelper::WayType type)
 {
   DirectRoute ret;
   city::Helper helper( city );

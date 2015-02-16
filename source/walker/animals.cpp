@@ -17,8 +17,8 @@
 // Copyright 2012-2014 Dalerank, dalerankn8@gmail.com
 
 #include "animals.hpp"
-#include "core/variant.hpp"
-#include "city/city.hpp"
+#include "core/variant_map.hpp"
+#include "city/helper.hpp"
 #include "pathway/pathway_helper.hpp"
 #include "core/gettext.hpp"
 #include "gfx/tilemap.hpp"
@@ -26,13 +26,14 @@
 #include "corpse.hpp"
 #include "helper.hpp"
 #include "ability.hpp"
+#include "walkers_factory.hpp"
 
 using namespace constants;
 using namespace gfx;
 
-namespace {
-CAESARIA_LITERALCONST(destination)
-}
+REGISTER_CLASS_IN_WALKERFACTORY(walker::sheep, Sheep)
+REGISTER_CLASS_IN_WALKERFACTORY(walker::wolf, Wolf)
+REGISTER_CLASS_IN_WALKERFACTORY(walker::zebra, Zebra)
 
 class Animal::Impl
 {
@@ -43,6 +44,7 @@ public:
 Animal::Animal(PlayerCityPtr city )
   : Walker( city ), _d( new Impl )
 {
+  setFlag( Walker::vividly, true );
   _setType( walker::unknown );
 
   setName( _("##animal##") );
@@ -61,16 +63,24 @@ Animal::~Animal() {}
 void Animal::save( VariantMap& stream ) const
 {
   Walker::save( stream );
-  stream[ lc_destination ] = _d->destination;
+  VARIANT_SAVE_ANY_D( stream, _d, destination )
 }
 
 void Animal::load( const VariantMap& stream )
 {
   Walker::load( stream );
-  _d->destination = stream.get( lc_destination ).toTilePos();
+  VARIANT_LOAD_ANY_D( _d, destination, stream )
 }
 
-std::string Animal::currentThinks() const{  return "##sheep_baa##";}
+std::string Animal::thoughts(Thought th) const
+{
+  if( th == thCurrent )
+  {
+    return "##sheep_baa##";
+  }
+
+  return "";
+}
 
 void Animal::_findNewWay( const TilePos& start )
 {
@@ -131,7 +141,7 @@ Herbivorous::Herbivorous(walker::Type type, PlayerCityPtr city)
  : Animal( city )
 {
   _setType( type );
-  setName( WalkerHelper::getPrettyTypeName( type ) );
+  setName( WalkerHelper::getPrettyTypename( type ) );
 
   addAbility( Illness::create( 0.2, 4 ) );
   _noWayCount = 0;
@@ -183,34 +193,33 @@ void Wolf::_centerTile()
   Animal::_centerTile();
 
   TilePos offset(1,1);
-  WalkerList walkers = _city()->walkers( walker::any, pos() - offset, pos() + offset );
+  city::Helper helper( _city() );
+  WalkerList walkers = helper.find<Walker>( walker::any, pos() - offset, pos() + offset );
   walkers = walkers.exclude<Wolf>();
 
   if( !walkers.empty() )
   {
-    WalkerList::iterator it = walkers.begin();
-    std::advance( it, math::random( walkers.size() - 1 ) );
+    WalkerPtr wlk = walkers.random();
 
-    turn( (*it)->pos() );
+    turn( wlk->pos() );
     _setAction( acFight );
     //setSpeedMultiplier( 0.0 );
-    _d->attackPos = (*it)->pos();
+    _d->attackPos = wlk->pos();
   }
 }
 
 void Wolf::_findNewWay( const TilePos& start )
 {
   TilePos offset(10,10);
-  WalkerList walkers = _city()->walkers( walker::any, start - offset, start + offset );
+  city::Helper helper( _city() );
+  WalkerList walkers = helper.find<Walker>( walker::any, start - offset, start + offset );
   walkers = walkers.exclude<Wolf>();
 
   Pathway pathway;
   if( !walkers.empty() )
   {
-    WalkerList::iterator it = walkers.begin();
-    std::advance( it, math::random( walkers.size() - 1 ) );
-
-    pathway = PathwayHelper::create( start, (*it)->pos(), PathwayHelper::allTerrain );
+    WalkerPtr wlk = walkers.random();
+    pathway = PathwayHelper::create( start, wlk->pos(), PathwayHelper::allTerrain );
   }
 
   if( !pathway.isValid() )
@@ -247,7 +256,7 @@ void Wolf::timeStep(const unsigned long time)
   {
   case acFight:
   {
-    WalkerList walkers = _city()->walkers( walker::any, _d->attackPos );
+    WalkerList walkers = _city()->walkers( _d->attackPos );
     walkers = walkers.exclude<Wolf>();
 
     if( !walkers.empty() )
@@ -280,6 +289,7 @@ void Wolf::send2City(const TilePos &start )
 Fish::Fish(PlayerCityPtr city)
  : Walker( city )
 {
+  setFlag( Walker::vividly, true );
   _setType( walker::unknown );
 
   setName( _("##fish##") );

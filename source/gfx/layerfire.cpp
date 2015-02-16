@@ -30,6 +30,10 @@ using namespace constants;
 namespace gfx
 {
 
+namespace layer
+{
+
+
 static const char* fireLevelName[] = {
                                        "##no_fire_risk##",
                                        "##very_low_fire_risk##", "##some_low_fire_risk##", "##low_fire_risk##",
@@ -39,9 +43,9 @@ static const char* fireLevelName[] = {
                                      };
 
 
-int LayerFire::type() const {  return citylayer::fire; }
+int Fire::type() const {  return citylayer::fire; }
 
-void LayerFire::drawTile(Engine& engine, Tile& tile, const Point& offset)
+void Fire::drawTile(Engine& engine, Tile& tile, const Point& offset)
 {
   Point screenPos = tile.mappos() + offset;
 
@@ -55,52 +59,29 @@ void LayerFire::drawTile(Engine& engine, Tile& tile, const Point& offset)
     bool needDrawAnimations = false;
     TileOverlayPtr overlay = tile.overlay();
     int fireLevel = 0;
-    switch( overlay->type() )
+    if( _isVisibleObject( overlay->type() ) )
     {
-    // Base set of visible objects
-    case construction::road:
-    case construction::plaza:
-    case construction::garden:
-
-    case building::burnedRuins:
-    case building::collapsedRuins:
-
-    case building::lowBridge:
-    case building::highBridge:
-
-    case building::elevation:
-    case building::rift:
-
-    // Fire-related
-    case building::prefecture:
-    case building::burningRuins:
+      // Base set of visible objects
       needDrawAnimations = true;
-    break;
-
-    case building::house:
+    }
+    else if( overlay->type() == objects::house )
+    {
+      HousePtr house = ptr_cast<House>( overlay );
+      fireLevel = (int)house->state( Construction::fire );
+      needDrawAnimations = (house->spec().level() == 1) && house->habitants().empty();
+      city::Helper helper( _city() );
+      drawArea( engine, helper.getArea( overlay ), offset, ResourceGroup::foodOverlay, OverlayPic::inHouseBase  );
+    }
+    else //other buildings
+    {
+      ConstructionPtr constr = ptr_cast<Construction>( overlay );
+      if( constr != 0 )
       {
-        HousePtr house = ptr_cast<House>( overlay );
-        fireLevel = (int)house->state( Construction::fire );
-        needDrawAnimations = (house->spec().level() == 1) && house->habitants().empty();
-
-        city::Helper helper( _city() );
-        drawArea( engine, helper.getArea( overlay ), offset, ResourceGroup::foodOverlay, OverlayPic::inHouseBase  );
+        fireLevel = (int)constr->state( Construction::fire );
       }
-    break;
 
-      //other buildings
-    default:
-      {
-        ConstructionPtr constr = ptr_cast<Construction>( overlay );
-        if( constr != 0 )
-        {
-          fireLevel = (int)constr->state( Construction::fire );
-        }
-
-        city::Helper helper( _city() );
-        drawArea( engine, helper.getArea( overlay ), offset, ResourceGroup::foodOverlay, OverlayPic::base  );
-      }
-    break;
+      city::Helper helper( _city() );
+      drawArea( engine, helper.getArea( overlay ), offset, ResourceGroup::foodOverlay, OverlayPic::base  );
     }
 
     if( needDrawAnimations )
@@ -110,14 +91,14 @@ void LayerFire::drawTile(Engine& engine, Tile& tile, const Point& offset)
     }
     else if( fireLevel >= 0)
     {
-      drawColumn( engine, screenPos, fireLevel );
+      _addColumn( screenPos, fireLevel );
     }
   }
 
   tile.setWasDrawn();
 }
 
-void LayerFire::handleEvent(NEvent& event)
+void Fire::handleEvent(NEvent& event)
 {
   if( event.EventType == sEventMouse )
   {
@@ -148,19 +129,21 @@ void LayerFire::handleEvent(NEvent& event)
   Layer::handleEvent( event );
 }
 
-LayerPtr LayerFire::create( Camera& camera, PlayerCityPtr city)
+LayerPtr Fire::create( Camera& camera, PlayerCityPtr city)
 {
-  LayerPtr ret( new LayerFire( camera, city ) );
+  LayerPtr ret( new Fire( camera, city ) );
   ret->drop();
 
   return ret;
 }
 
-LayerFire::LayerFire( Camera& camera, PlayerCityPtr city)
-  : Layer( &camera, city )
+Fire::Fire( Camera& camera, PlayerCityPtr city)
+  : Info( camera, city, 18 )
 {
-  _loadColumnPicture( 18 );
   _addWalkerType( walker::prefect );
+  _fillVisibleObjects( citylayer::fire );
+}
+
 }
 
 }//end namespace gfx

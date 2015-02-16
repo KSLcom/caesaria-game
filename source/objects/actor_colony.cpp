@@ -20,10 +20,13 @@
 #include "constants.hpp"
 #include "walker/trainee.hpp"
 #include "city/city.hpp"
+#include "objects_factory.hpp"
 
 using namespace constants;
 
-ActorColony::ActorColony() : TrainingBuilding( building::actorColony, Size(3) )
+REGISTER_CLASS_IN_OVERLAYFACTORY(objects::actorColony, ActorColony)
+
+ActorColony::ActorColony() : TrainingBuilding( objects::actorColony, Size(3) )
 {
   _fgPicturesRef().resize(1);
 }

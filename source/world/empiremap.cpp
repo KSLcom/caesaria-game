@@ -18,6 +18,7 @@
 #include "empiremap.hpp"
 #include "core/logger.hpp"
 #include "core/foreach.hpp"
+#include "core/variant_map.hpp"
 #include "routefinder.hpp"
 
 namespace world
@@ -98,7 +99,7 @@ Route EmpireMap::findRoute(Point start, Point stop, int flags ) const
 
   foreach( pos, tiles)
   {
-    way.push_back( _d->tp2pnt( *pos ) + Point( 10, 10 ) );
+    way.push_back( _d->tp2pnt( *pos ) );
   }
 
   return way;

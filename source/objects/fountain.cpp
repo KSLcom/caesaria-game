@@ -17,7 +17,7 @@
 
 #include "fountain.hpp"
 
-#include "core/stringhelper.hpp"
+#include "core/utils.hpp"
 #include "core/time.hpp"
 #include "core/position.hpp"
 #include "game/resourcegroup.hpp"
@@ -28,14 +28,18 @@
 #include "city/city.hpp"
 #include "core/foreach.hpp"
 #include "gfx/tilemap.hpp"
+#include "core/variant_map.hpp"
 #include "core/logger.hpp"
 #include "constants.hpp"
 #include "game/gamedate.hpp"
 #include "walker/workerhunter.hpp"
 #include "events/returnworkers.hpp"
+#include "objects_factory.hpp"
 
 using namespace constants;
 using namespace gfx;
+
+REGISTER_CLASS_IN_OVERLAYFACTORY(objects::fountain, Fountain)
 
 namespace {
 static const unsigned int fillDistanceNormal = 4;
@@ -43,7 +47,7 @@ static const unsigned int fillDistanceDesert = 3;
 }
 
 typedef enum { prettyFountain=2, fontainEmpty = 3, fontainFull = 4, simpleFountain = 10, fontainSizeAnim = 7,
-               awesomeFountain=18, patricianFountain=26, testFountain=50 } FontainConstant;
+               awesomeFountain=18, patricianFountain=26, testFountain=10 } FontainConstant;
 
 class Fountain::Impl
 {
@@ -56,7 +60,7 @@ public:
 };
 
 Fountain::Fountain()
-  : ServiceBuilding(Service::fountain, building::fountain, Size(1)),
+  : ServiceBuilding(Service::fountain, objects::fountain, Size(1)),
     _d( new Impl )
 {  
   setPicture( ResourceGroup::utilitya, 10 );
@@ -83,7 +87,7 @@ void Fountain::deliverService()
 void Fountain::timeStep(const unsigned long time)
 {
   //filled area, that fontain present and work
-  if( GameDate::isDayChanged() )
+  if( game::Date::isDayChanged() )
   {
     _d->haveReservoirWater = tile().param( Tile::pReservoirWater ) > 0;
 
@@ -104,7 +108,7 @@ void Fountain::timeStep(const unsigned long time)
     }
   }
 
-  if( GameDate::isWeekChanged() )
+  if( game::Date::isWeekChanged() )
   {
     int desPic[] = { simpleFountain, testFountain, prettyFountain, awesomeFountain, patricianFountain };
     int currentId = desPic[ math::clamp<int>( tile().param( Tile::pDesirability ) / 20, 0, 4 ) ];
@@ -125,12 +129,12 @@ void Fountain::timeStep(const unsigned long time)
   ServiceBuilding::timeStep( time );
 }
 
-bool Fountain::canBuild(PlayerCityPtr city, TilePos pos, const TilesArray& aroundTiles ) const
+bool Fountain::canBuild( const CityAreaInfo& areaInfo ) const
 {
-  bool ret = Construction::canBuild( city, pos, aroundTiles );
+  bool ret = Construction::canBuild( areaInfo );
 
-  Tilemap& tmap = city->tilemap();
-  const Tile& tile = tmap.at( pos );
+  Tilemap& tmap = areaInfo.city->tilemap();
+  const Tile& tile = tmap.at( areaInfo.pos );
   Fountain* thisp = const_cast< Fountain* >( this );
   thisp->_fgPicturesRef().clear();
   thisp->setPicture( ResourceGroup::utilitya, 10 );
@@ -138,21 +142,21 @@ bool Fountain::canBuild(PlayerCityPtr city, TilePos pos, const TilesArray& aroun
   if( tile.param( Tile::pReservoirWater ) )
   {
     thisp->_fgPicturesRef().push_back( Picture::load( ResourceGroup::utilitya, 11 ) );
-    thisp->_fgPicturesRef().back().setOffset( 12, 8 + picture().offset().y() );
+    //thisp->_fgPicturesRef().back().setOffset( 12, 8 + picture().offset().y() );
   }
 
   return ret;
 }
 
-bool Fountain::build(PlayerCityPtr city, const TilePos& pos )
+bool Fountain::build( const CityAreaInfo& info )
 {
-  ServiceBuilding::build( city, pos );
+  ServiceBuilding::build( info );
 
   setPicture( ResourceGroup::utilitya, 10 );
   _d->lastPicId = simpleFountain;
   _initAnimation();
 
-  _d->fillDistance = (city->climate() == climateDesert)
+  _d->fillDistance = (info.city->climate() == game::climate::desert)
                      ? fillDistanceDesert
                      : fillDistanceNormal;
 
@@ -169,7 +173,7 @@ bool Fountain::haveReservoirAccess() const
   foreach( tile, reachedTiles )
   {
     TileOverlayPtr overlay = (*tile)->overlay();
-    if( overlay.isValid() && (building::reservoir == overlay->type()) )
+    if( overlay.isValid() && (objects::reservoir == overlay->type()) )
     {
       return true;
     }
@@ -225,7 +229,7 @@ void Fountain::_initAnimation()
   _fgPicture( 0 ) = Picture::getInvalid();
   _animationRef().stop();
 
-  switch ( _d->lastPicId )
+  /*switch ( _d->lastPicId )
   {
   case simpleFountain: _animationRef().setOffset( Point( 12, 24 ) ); break;
   //case testFountain: _animationRef().setOffset( Point( 0, 31 ) ); break;
@@ -233,5 +237,5 @@ void Fountain::_initAnimation()
   case awesomeFountain: _animationRef().setOffset( Point( 12, 24 ) ); break;
   case patricianFountain: _animationRef().setOffset( Point( 14, 26 ) ); break;
   default: break;
-  }
+  }*/
 }

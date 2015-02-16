@@ -20,26 +20,88 @@
 #include "walker/constants.hpp"
 #include "city_renderer.hpp"
 #include "city/city.hpp"
+#include "camera.hpp"
+#include "gui/senate_popup_info.hpp"
+#include "objects/senate.hpp"
 
 using namespace constants;
 
 namespace gfx
 {
 
-int LayerSimple::type() const { return citylayer::simple; }
-
-LayerPtr LayerSimple::create( Camera& camera, PlayerCityPtr city)
+namespace layer
 {
-  LayerPtr ret( new LayerSimple( camera, city ) );
+
+class Simple::Impl
+{
+public:
+  SenatePopupInfo senateInfo;
+  PictureRef selectedBuildingPic;
+  TileOverlayPtr lastOverlay;
+};
+
+int Simple::type() const { return citylayer::simple; }
+
+LayerPtr Simple::create( Camera& camera, PlayerCityPtr city)
+{
+  LayerPtr ret( new Simple( camera, city ) );
   ret->drop();
 
   return ret;
 }
 
-LayerSimple::LayerSimple( Camera& camera, PlayerCityPtr city)
-  : Layer( &camera, city )
+void Simple::drawTile(Engine& engine, Tile& tile, const Point& offset)
+{
+  TileOverlayPtr curOverlay = tile.overlay();
+
+  bool blowTile = (curOverlay.isValid() && curOverlay == _d->lastOverlay);
+  if( blowTile )
+    engine.setColorMask( 0x007f0000, 0x00007f00, 0x0000007f, 0xff000000 );
+
+  Layer::drawTile(engine, tile, offset);
+
+  if( blowTile )
+      engine.resetColorMask();
+}
+
+void Simple::afterRender(Engine& engine)
+{
+  Layer::afterRender( engine );
+
+  _d->lastOverlay = 0;
+  Tile* tile = _currentTile();
+  if( tile )
+  {
+    TileOverlayPtr curOverlay = tile->overlay();
+    if( is_kind_of<Building>( curOverlay ) )
+    {
+      _d->lastOverlay = curOverlay;
+    }
+  }
+}
+
+void Simple::renderUi(Engine &engine)
+{
+  Layer::renderUi( engine );
+
+  Tile* lastTile = _currentTile();
+  if( lastTile )
+  {
+    TileOverlayPtr ov = lastTile->overlay();
+    SenatePtr senate = ptr_cast<Senate>( ov );
+    if( senate.isValid() )
+    {
+      _d->senateInfo.draw( _lastCursorPos(), Engine::instance(), senate );
+    }
+  }
+}
+
+Simple::Simple( Camera& camera, PlayerCityPtr city)
+  : Layer( &camera, city ), _d( new Impl )
 {
   _addWalkerType( walker::all );
 }
+
+}//
 
 }//end namespace gfx

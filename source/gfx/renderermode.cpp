@@ -88,24 +88,29 @@ Renderer::ModePtr BuildMode::create(TileOverlay::Type type )
 
   switch( type )
   {
-  case construction::road:
+  case objects::road:
     newCommand->_d->isBorderBuilding = true;
     newCommand->_d->isMultiBuilding = true;
+    newCommand->_d->isCheckWalkers = false;
     newCommand->_d->isRoadAssignment = false;
   break;
 
-  case building::aqueduct:
-  case building::wall:
-  case building::fortification:
+  case objects::aqueduct:
+  case objects::wall:
+  case objects::fortification:
     newCommand->_d->isBorderBuilding = true;
     newCommand->_d->isMultiBuilding = true;
   break;
 
-  case building::house:
-  case construction::garden:
-  case construction::plaza:
+  case objects::garden:
     newCommand->_d->isMultiBuilding = true;
-    newCommand->_d->isCheckWalkers = (type == building::house);
+    newCommand->_d->isCheckWalkers = true;
+  break;
+
+  case objects::house:
+  case objects::plaza:
+    newCommand->_d->isMultiBuilding = true;
+    newCommand->_d->isCheckWalkers = false;
   break;
 
   default:

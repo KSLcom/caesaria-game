@@ -18,17 +18,17 @@
 #ifndef __CAESARIA_PATRICIAN_H_INCLUDED__
 #define __CAESARIA_PATRICIAN_H_INCLUDED__
 
-#include "walker.hpp"
-#include "core/predefinitions.hpp"
+#include "human.hpp"
+#include "predefinitions.hpp"
 
 /** This is an immigrant coming with his stuff */
-class Patrician : public Walker
+class Patrician : public Human
 {
 public:
-  Patrician( PlayerCityPtr city );
-  ~Patrician();
+  static PatricianPtr create( PlayerCityPtr city );
+  virtual ~Patrician();
 
-  virtual void send2City(TilePos start );
+  virtual void send2City( TilePos start );
 
   virtual void save(VariantMap& stream) const;
   virtual void load(const VariantMap& stream);
@@ -37,6 +37,10 @@ public:
 
 protected:
   void _findNewWay(const TilePos& start);
+  virtual void _reachedPathway();
+
+private:
+  Patrician( PlayerCityPtr city );
 
   class Impl;
   ScopedPtr< Impl > _d;

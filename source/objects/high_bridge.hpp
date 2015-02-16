@@ -25,9 +25,9 @@ class HighBridge : public Construction
 public:
   HighBridge();
 
-  virtual bool canBuild(PlayerCityPtr city, TilePos pos , const gfx::TilesArray& aroundTiles) const;
+  virtual bool canBuild(const CityAreaInfo& areaInfo) const;
   virtual void initTerrain( gfx::Tile& terrain );
-  virtual bool build( PlayerCityPtr city, const TilePos& pos );
+  virtual bool build(const CityAreaInfo &info);
   virtual bool canDestroy() const;
   virtual void destroy();
   virtual std::string errorDesc() const;
@@ -35,6 +35,8 @@ public:
 
   virtual void save(VariantMap &stream) const;
   virtual void load(const VariantMap &stream);
+
+  void hide();
 
 private:
   bool _checkOnlyWaterUnderBridge(PlayerCityPtr city, const TilePos& start, const TilePos& stop) const;

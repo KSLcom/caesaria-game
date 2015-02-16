@@ -30,12 +30,10 @@ class Water : public city::Srvc
 public:
   static city::SrvcPtr create( PlayerCityPtr city );
 
-  void update( const unsigned int time );
+  virtual void timeStep(const unsigned int time );
+
 private:
   Water( PlayerCityPtr city );
-
-  class Impl;
-  ScopedPtr< Impl > _d;
 };
 
 }//end namespace city

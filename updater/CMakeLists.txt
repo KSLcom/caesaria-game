@@ -8,7 +8,7 @@ aux_source_directory(. UPD_SRC_LIST)
 file(GLOB UPD_INC_LIST "*.hpp")
 
 set( UPD_DEP_SOURCES_LIST
-      "${BASE_SOURCE_DIR}/core/stringhelper.cpp"
+      "${BASE_SOURCE_DIR}/core/utils.cpp"
       "${BASE_SOURCE_DIR}/core/bytearray.cpp"
       "${BASE_SOURCE_DIR}/core/logger.cpp"
       "${BASE_SOURCE_DIR}/thread/mutex.cpp"
@@ -41,12 +41,18 @@ if( BUILD_CURL )
   add_definitions( -DCURL_STATICLIB )
   add_definitions( -DCURL_DISABLE_POP3 )
   add_definitions( -DCURL_DISABLE_SMTP )
-  link_directories(${CURLLIB_HOME})
-  target_link_libraries(${PROJECT_NAME} ${CURL_LIBRARIES})
+  include_directories(${CURL_INCLUDE_DIR})
+  target_link_libraries(${PROJECT_NAME} ${CURL_LIBRARY})
+endif()
+
+find_package( CURL )
+if (CURL_FOUND)
+  include_directories(${CURL_INCLUDE_DIR})
+  target_link_libraries(${PROJECT_NAME} ${CURL_LIBRARY})
 endif()
 
 if(WIN32)
-  target_link_libraries( ${PROJECT_NAME} psapi ${CURLLIB_NAME} ws2_32 )
+  target_link_libraries( ${PROJECT_NAME} psapi ${CURL_LIBRARY} ws2_32 )
   set(EXECUTABLE_FILENAME "updater")
 endif(WIN32)
 
@@ -56,7 +62,7 @@ if(HAIKU)
 endif(HAIKU)
 
 if(UNIX)
-  target_link_libraries( ${PROJECT_NAME} ${CURLLIB_NAME} )
+  target_link_libraries( ${PROJECT_NAME} ${CURL_LIBRARY} )
   target_link_libraries( ${PROJECT_NAME} pthread )
   set(EXECUTABLE_FILENAME "updater.linux")
 endif(UNIX)

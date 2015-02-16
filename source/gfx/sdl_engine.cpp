@@ -22,9 +22,10 @@
 #include <string>
 #include <sstream>
 #include <list>
+#include <set>
 #include <vector>
 #include <SDL.h>
-#include <ttf/SDL_ttf.h>
+#include <SDL_ttf.h>
 
 #include "IMG_savepng.h"
 #include "core/exception.hpp"
@@ -33,7 +34,7 @@
 #include "pictureconverter.hpp"
 #include "core/time.hpp"
 #include "core/logger.hpp"
-#include "core/stringhelper.hpp"
+#include "core/utils.hpp"
 #include "core/font.hpp"
 #include "core/eventconverter.hpp"
 #include "core/foreach.hpp"
@@ -62,6 +63,8 @@ public:
     int blue;
     int alpha;
     bool enabled;
+
+    void reset() { red = green = blue = alpha = 0; enabled = false; }
   }MaskInfo;
 
   Picture screen;
@@ -69,6 +72,8 @@ public:
 
   SDL_Window *window;
   SDL_Renderer *renderer;
+
+  std::map< int, SDL_Texture* > renderTargets;
 
   MaskInfo mask;
   unsigned int fps, lastFps;
@@ -112,7 +117,7 @@ void SdlEngine::init()
   int rc = SDL_Init(SDL_INIT_VIDEO);
   if (rc != 0)
   {
-    Logger::warning( StringHelper::format( 0xff, "CRITICAL!!! Unable to initialize SDL: %d", SDL_GetError() ) );
+    Logger::warning( utils::format( 0xff, "CRITICAL!!! Unable to initialize SDL: %s", SDL_GetError() ) );
     THROW("SDLGraficEngine: Unable to initialize SDL: " << SDL_GetError());
   }
 
@@ -120,7 +125,7 @@ void SdlEngine::init()
   rc = TTF_Init();
   if (rc != 0)
   {
-    Logger::warning( StringHelper::format( 0xff, "CRITICAL!!! Unable to initialize ttf: %d", SDL_GetError() ) );
+    Logger::warning( utils::format( 0xff, "CRITICAL!!! Unable to initialize ttf: %s", SDL_GetError() ) );
     THROW("SDLGraficEngine: Unable to initialize SDL: " << SDL_GetError());
   }
 
@@ -136,7 +141,7 @@ void SdlEngine::init()
 
 #ifdef CAESARIA_PLATFORM_ANDROID
   //_srcSize = Size( mode.w, mode.h );
-  Logger::warning( StringHelper::format( 0xff, "SDLGraficEngine: Android set mode %dx%d",  _srcSize.width(), _srcSize.height() ) );
+  Logger::warning( utils::format( 0xff, "SDLGraficEngine: Android set mode %dx%d",  _srcSize.width(), _srcSize.height() ) );
 
   SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 0);
 
@@ -152,7 +157,7 @@ void SdlEngine::init()
   SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
 #else
   unsigned int flags = SDL_WINDOW_OPENGL;
-  Logger::warning( StringHelper::format( 0xff, "SDLGraficEngine: set mode %dx%d",  _srcSize.width(), _srcSize.height() ) );
+  Logger::warning( utils::format( 0xff, "SDLGraficEngine: set mode %dx%d",  _srcSize.width(), _srcSize.height() ) );
 
   if(isFullscreen())
   {
@@ -166,35 +171,41 @@ void SdlEngine::init()
   else
   {
     window = SDL_CreateWindow("CaesariA",
-        SDL_WINDOWPOS_UNDEFINED,
-        SDL_WINDOWPOS_UNDEFINED,
+        SDL_WINDOWPOS_CENTERED,
+        SDL_WINDOWPOS_CENTERED,
         _srcSize.width(), _srcSize.height(),
         flags);
   }
 
   if (window == NULL)
   {
-    Logger::warning( StringHelper::format( 0xff, "CRITICAL!!! Unable to create SDL-window: %d", SDL_GetError() ) );
+    Logger::warning( utils::format( 0xff, "CRITICAL!!! Unable to create SDL-window: %s", SDL_GetError() ) );
     THROW("Failed to create window");
   }
 
   Logger::warning("SDLGraficEngine: init successfull");
 #endif
 
-  int render_version = math::clamp( GameSettings::get( "render_version" ).toInt(), -1, SDL_GetNumRenderDrivers());
-  SDL_Renderer *renderer = SDL_CreateRenderer(window, render_version, SDL_RENDERER_ACCELERATED );
+  int render_version = math::clamp( game::Settings::get( "render_mode" ).toInt(), 0, SDL_GetNumRenderDrivers());
+  SDL_Renderer *renderer = SDL_CreateRenderer(window, render_version-1, SDL_RENDERER_ACCELERATED );
 
   if (renderer == NULL)
   {
-    Logger::warning( StringHelper::format( 0xff, "CRITICAL!!! Unable to create renderer: %d", SDL_GetError() ) );
+    Logger::warning( utils::format( 0xff, "CRITICAL!!! Unable to create renderer: %s", SDL_GetError() ) );
     THROW("Failed to create renderer");
   }
 
-  //SDL_SetHint("SDL_RENDER_OPENGL_SHADERS", "0" );
-  if (isFullscreen())
+  _virtualSize = _srcSize;
+  if( isFullscreen() )
   {
+    SDL_DisplayMode mode;
+    SDL_GetDisplayMode(0, 0, &mode);
+    unsigned int fullscreenVirtualWidth = mode.w;
+    unsigned int fullscreenVirtualHeight = mode.h;
+
     SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");  // make the scaled rendering look smoother.
-    SDL_RenderSetLogicalSize(renderer, _srcSize.width(), _srcSize.height());
+    SDL_RenderSetLogicalSize(renderer, fullscreenVirtualWidth, fullscreenVirtualHeight );
+    _virtualSize = Size( fullscreenVirtualWidth, fullscreenVirtualHeight );
   }
 
   SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
@@ -214,11 +225,12 @@ void SdlEngine::init()
 
   SDL_Texture *screenTexture = SDL_CreateTexture(renderer,
                                                  SDL_PIXELFORMAT_ARGB8888,
-                                                 SDL_TEXTUREACCESS_STREAMING,
+                                                 SDL_TEXTUREACCESS_TARGET,
                                                  _srcSize.width(), _srcSize.height());
 
   Logger::warning( "SDLGraficEngine: init successfull");
   _d->screen.init( screenTexture, 0, 0 );
+  _d->screen.setOriginRect( Rect( 0, 0, _srcSize.width(), _srcSize.height() ) );
 
   if( !_d->screen.isValid() )
   {
@@ -226,7 +238,9 @@ void SdlEngine::init()
   }
 
   Logger::warning( "SDLGraficEngine: set caption");
-  SDL_SetWindowTitle( window, "CaesarIA: "CAESARIA_VERSION );
+  std::string versionStr = utils::format( 0xff, "CaesarIA: SDL build %d [%s:%s]",
+                                          CAESARIA_BUILD_NUMBER, CAESARIA_PLATFORM_NAME, CAESARIA_COMPILER_NAME );
+  SDL_SetWindowTitle( window, versionStr.c_str() );
 
   _d->window = window;
   _d->renderer = renderer;
@@ -245,7 +259,7 @@ void SdlEngine::loadPicture(Picture& ioPicture, bool streaming)
   if( !ioPicture.surface() )
   {
     Size size = ioPicture.size();
-    Logger::warning( StringHelper::format( 0xff, "SdlEngine:: can't make surface, size=%dx%d", size.width(), size.height() ) );
+    Logger::warning( utils::format( 0xff, "SdlEngine:: can't make surface, size=%dx%d", size.width(), size.height() ) );
   }
 
   SDL_Texture* tx = 0;
@@ -276,8 +290,15 @@ void SdlEngine::loadPicture(Picture& ioPicture, bool streaming)
 
 void SdlEngine::unloadPicture( Picture& ioPicture )
 {
-  if( ioPicture.surface() ) SDL_FreeSurface( ioPicture.surface() );
-  if( ioPicture.texture() ) SDL_DestroyTexture( ioPicture.texture() );
+  try
+  {
+    if( ioPicture.surface() ) SDL_FreeSurface( ioPicture.surface() );
+    if( ioPicture.texture() ) SDL_DestroyTexture( ioPicture.texture() );
+  }
+  catch(...)
+  {
+
+  }
 
   ioPicture = Picture();
 }
@@ -293,13 +314,16 @@ void SdlEngine::endRenderFrame()
 {
   if( getFlag( Engine::debugInfo ) )
   {
-    std::string debugText = StringHelper::format( 0xff, "fps:%d call:%d", _d->lastFps, _d->drawCall );
+    std::string debugText = utils::format( 0xff, "fps:%d call:%d", _d->lastFps, _d->drawCall );
     _d->fpsText->fill( 0, Rect() );
     _d->debugFont.draw( *_d->fpsText, debugText, Point( 0, 0 ) );
     draw( *_d->fpsText, Point( _d->screen.width() / 2, 2 ) );
   }
 
   //Refresh the screen
+  //SDL_SetRenderTarget( _d->renderer, NULL );
+
+  //SDL_RenderCopyEx(_d->renderer, _d->screen.texture(), 0, 0, 0, 0, SDL_FLIP_HORIZONTAL );
   SDL_RenderPresent(_d->renderer);
 
   _d->fps++;
@@ -332,7 +356,8 @@ void SdlEngine::draw(const Picture &picture, const int dx, const int dy, Rect* c
 
   const Impl::MaskInfo& mask = _d->mask;
   SDL_Texture* ptx = picture.texture();
-  const Size& picSize = picture.size();
+  const Rect& orect = picture.originRect();
+  Size picSize = orect.size();
   const Point& offset = picture.offset();
 
   if( mask.enabled )
@@ -341,7 +366,7 @@ void SdlEngine::draw(const Picture &picture, const int dx, const int dy, Rect* c
     SDL_SetTextureAlphaMod( ptx, mask.alpha >> 24 );
   }
 
-  SDL_Rect srcRect = { 0, 0, picSize.width(), picSize.height() };
+  SDL_Rect srcRect = { orect.left(), orect.top(), picSize.width(), picSize.height() };
   SDL_Rect dstRect = { dx+offset.x(), dy-offset.y(), picSize.width(), picSize.height() };
 
   SDL_RenderCopy( _d->renderer, ptx, &srcRect, &dstRect );
@@ -383,7 +408,8 @@ void SdlEngine::draw( const Pictures& pictures, const Point& pos, Rect* clipRect
   {
     const Picture& picture = *it;
     SDL_Texture* ptx = picture.texture();
-    const Size& size = picture.size();
+    const Rect& orect = picture.originRect();
+    Size size = orect.size();
     const Point& offset = picture.offset();
 
     if( mask.enabled )
@@ -392,7 +418,7 @@ void SdlEngine::draw( const Pictures& pictures, const Point& pos, Rect* clipRect
       SDL_SetTextureAlphaMod( ptx, mask.alpha >> 24 );
     }
 
-    SDL_Rect srcRect = { 0, 0, size.width(), size.height() };
+    SDL_Rect srcRect = { orect.left(), orect.top(), size.width(), size.height() };
     SDL_Rect dstRect = { pos.x() + offset.x(), pos.y() - offset.y(), size.width(), size.height() };
 
     SDL_RenderCopy( _d->renderer, ptx, &srcRect, &dstRect );
@@ -473,9 +499,44 @@ void SdlEngine::setColorMask( int rmask, int gmask, int bmask, int amask )
   mask.enabled = true;
 }
 
-void SdlEngine::resetColorMask()
+void SdlEngine::resetColorMask() { _d->mask.reset(); }
+
+void SdlEngine::initViewport(int index, Size s)
 {
-  memset( &_d->mask, 0, sizeof(Impl::MaskInfo) );
+  SDL_Texture*& target = _d->renderTargets[ index ];
+  if( target != 0 )
+  {
+    SDL_DestroyTexture( target );
+    target = 0;
+  }
+
+  if( s.area() > 0 )
+  {
+    target = SDL_CreateTexture( _d->renderer, SDL_PIXELFORMAT_RGBA8888,
+                                SDL_TEXTUREACCESS_TARGET, s.width(), s.height() );
+  }
+}
+
+void SdlEngine::setViewport(int index, bool render)
+{
+  SDL_Texture* target = _d->renderTargets.at( index );
+  if( target )
+  {
+    SDL_SetRenderTarget( _d->renderer, render ? target : 0 );
+    if( render )
+    {
+      SDL_RenderClear(_d->renderer);  // black background for a complete redraw
+    }
+  }
+}
+
+void SdlEngine::drawViewport(int index, Rect r)
+{
+  SDL_Texture* target = _d->renderTargets[ index ];
+  if( target )
+  {
+    SDL_RenderCopyEx(_d->renderer, target, 0, 0, 0, 0, SDL_FLIP_NONE );
+  }
 }
 
 void SdlEngine::createScreenshot( const std::string& filename )
@@ -497,12 +558,19 @@ Engine::Modes SdlEngine::modes() const
   /* Get available fullscreen/hardware modes */
   int num = SDL_GetNumDisplayModes(0);
 
+  std::set<unsigned int> uniqueModes;
+
   for (int i = 0; i < num; ++i)
   {
     SDL_DisplayMode mode;
     if (SDL_GetDisplayMode(0, i, &mode) == 0 && mode.w > 640 )
     {
-      ret.push_back(Size(mode.w, mode.h));
+      unsigned int modeHash = (mode.w << 16) + mode.h;
+      if( uniqueModes.count( modeHash ) == 0)
+      {
+        ret.push_back(Size(mode.w, mode.h));
+        uniqueModes.insert( modeHash );
+      }
     }
   }
 

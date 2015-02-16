@@ -38,7 +38,7 @@ public:
 
   static std::string defaultName();
 
-  virtual void update(const unsigned int time);
+  virtual void timeStep( const unsigned int time);
   virtual VariantMap save() const;
   virtual void load(const VariantMap &stream);
 
@@ -47,7 +47,7 @@ public:
   RequestList requests() const;
 
 private:
-  Dispatcher( PlayerCityPtr city );
+  Dispatcher(PlayerCityPtr city);
 
   class Impl;
   ScopedPtr<Impl> _d;

@@ -21,13 +21,16 @@
 #include "core/logger.hpp"
 #include "label.hpp"
 #include "core/gettext.hpp"
-#include "core/stringhelper.hpp"
+#include "core/utils.hpp"
 #include "widget_helper.hpp"
 
 namespace gui
 {
 
-class CityDonationWindow::Impl
+namespace dialog
+{
+
+class CityDonation::Impl
 {
 public:
   int wantSend, maxMoney;
@@ -35,14 +38,14 @@ public:
 
   void updateDonationText();
 
-public oc3_slots:
-  void sendMoney() { oc3_emit sendMoneySignal( wantSend ); }
+public slots:
+  void sendMoney() { emit sendMoneySignal( wantSend ); }
 
-public oc3_signals:
+public signals:
   Signal1<int> sendMoneySignal;
 };
 
-CityDonationWindow::CityDonationWindow( Widget* p, int money )
+CityDonation::CityDonation( Widget* p, int money )
   : Window( p, Rect( 0, 0, 1, 1 ), "" ), __INIT_IMPL(CityDonationWindow)
 {
   __D_IMPL(d,CityDonationWindow)
@@ -52,19 +55,16 @@ CityDonationWindow::CityDonationWindow( Widget* p, int money )
   setupUI( ":/gui/money2city.gui" );
   setCenter( parent()->center() );
 
-  PushButton* btnSend;
-  PushButton* btnCancel;
-  Label* lbBlack;
-  GET_WIDGET_FROM_UI( lbBlack )
-  GET_WIDGET_FROM_UI( btnCancel )
-  GET_WIDGET_FROM_UI( btnSend )
+  INIT_WIDGET_FROM_UI( Label*, lbBlack )
+  INIT_WIDGET_FROM_UI( PushButton*, btnCancel )
+  INIT_WIDGET_FROM_UI( PushButton*, btnSend )
   GET_DWIDGET_FROM_UI( d, lbDonation )
 
   d->updateDonationText();
 
   CONNECT( btnSend, onClicked(), _dfunc().data(), Impl::sendMoney );
-  CONNECT( btnSend, onClicked(), this, CityDonationWindow::deleteLater );
-  CONNECT( btnCancel, onClicked(), this, CityDonationWindow::deleteLater );
+  CONNECT( btnSend, onClicked(), this, CityDonation::deleteLater );
+  CONNECT( btnCancel, onClicked(), this, CityDonation::deleteLater );
 
   if( money == 0 )
   {
@@ -76,9 +76,9 @@ CityDonationWindow::CityDonationWindow( Widget* p, int money )
   }
 }
 
-CityDonationWindow::~CityDonationWindow() {}
+CityDonation::~CityDonation() {}
 
-bool CityDonationWindow::onEvent(const NEvent& event)
+bool CityDonation::onEvent(const NEvent& event)
 {
   __D_IMPL(d,CityDonationWindow)
   if( event.EventType == sEventGui && event.gui.type == guiButtonClicked )
@@ -109,12 +109,14 @@ bool CityDonationWindow::onEvent(const NEvent& event)
   return Widget::onEvent( event );
 }
 
-Signal1<int>& CityDonationWindow::onSendMoney() { return _dfunc()->sendMoneySignal; }
+Signal1<int>& CityDonation::onSendMoney() { return _dfunc()->sendMoneySignal; }
 
-void CityDonationWindow::Impl::updateDonationText()
+void CityDonation::Impl::updateDonationText()
 {
-  std::string text = StringHelper::format( 0xff, "%s %d from %d dn", _("##donation_is##"), wantSend, maxMoney );
+  std::string text = utils::format( 0xff, "%s %d from %d dn", _("##donation_is##"), wantSend, maxMoney );
   if( lbDonation ) lbDonation->setText( text );
 }
+
+}//end namespace dialog
 
 }//end namespace gui

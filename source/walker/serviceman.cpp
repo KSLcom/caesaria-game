@@ -17,21 +17,34 @@
 
 #include "serviceman.hpp"
 #include "gfx/tile.hpp"
-#include "core/variant.hpp"
+#include "core/variant_map.hpp"
 #include "city/city.hpp"
 #include "pathway/path_finding.hpp"
 #include "pathway/pathway_helper.hpp"
 #include "name_generator.hpp"
-#include "core/stringhelper.hpp"
+#include "core/utils.hpp"
 #include "gfx/tilemap.hpp"
 #include "core/logger.hpp"
 #include "constants.hpp"
 #include "game/resourcegroup.hpp"
 #include "corpse.hpp"
 #include "core/foreach.hpp"
+#include "walkers_factory.hpp"
 
 using namespace constants;
 using namespace gfx;
+
+REGISTER_SERVICEMAN_IN_WALKERFACTORY( walker::priest, Service::religionCeres, priest )
+REGISTER_SERVICEMAN_IN_WALKERFACTORY( walker::doctor, Service::doctor, doctor )
+REGISTER_SERVICEMAN_IN_WALKERFACTORY( walker::bathlady, Service::baths, bathlady )
+REGISTER_SERVICEMAN_IN_WALKERFACTORY( walker::actor, Service::theater, actor )
+REGISTER_SERVICEMAN_IN_WALKERFACTORY( walker::gladiator, Service::amphitheater, gladiator )
+REGISTER_SERVICEMAN_IN_WALKERFACTORY( walker::barber, Service::barber, barber )
+REGISTER_SERVICEMAN_IN_WALKERFACTORY( walker::surgeon, Service::hospital, surgeon )
+REGISTER_SERVICEMAN_IN_WALKERFACTORY( walker::scholar, Service::school, scholar )
+REGISTER_SERVICEMAN_IN_WALKERFACTORY( walker::librarian, Service::library, library )
+REGISTER_SERVICEMAN_IN_WALKERFACTORY( walker::teacher, Service::academy, teacher )
+REGISTER_SERVICEMAN_IN_WALKERFACTORY( walker::missioner, Service::missionary, missioner )
 
 namespace {
   const unsigned int defaultServiceDistance = 5;
@@ -43,14 +56,16 @@ public:
   BuildingPtr base;
   TilePos lastHousePos;
   Service::Type service;
+  Propagator::ObsoleteOverlays obsoleteOvs;
   unsigned int reachDistance;
-  int maxDistance;
+  unsigned int maxDistance;
 };
 
 ServiceWalker::ServiceWalker(PlayerCityPtr city, const Service::Type service)
-  : Walker( city ), _d( new Impl )
+  : Human( city ), _d( new Impl )
 {
   _setType( walker::serviceman );
+  _setNation( city->nation() );
   _d->maxDistance = defaultServiceDistance;
   _d->service = service;
   _d->reachDistance = 2;
@@ -80,24 +95,24 @@ void ServiceWalker::_init(const Service::Type service)
     _setType( walker::priest );
   break;
   
-  case Service::engineer: _setType( walker::engineer ); break;
-  case Service::doctor:   _setType( walker::doctor );   break;
-  case Service::hospital: _setType( walker::surgeon );  break;
-  case Service::barber:   _setType( walker::barber );   break;
-  case Service::baths:    _setType( walker::bathlady ); break;
-  case Service::school:   _setType( walker::scholar);   break;
+  case Service::engineer:  _setType( walker::engineer ); break;
+  case Service::doctor:    _setType( walker::doctor );   break;
+  case Service::hospital:  _setType( walker::surgeon );  break;
+  case Service::barber:    _setType( walker::barber );   break;
+  case Service::baths:     _setType( walker::bathlady ); break;
+  case Service::school:    _setType( walker::scholar);   break;
   case Service::theater:   _setType( walker::actor );    break;
   case Service::amphitheater: _setType( walker::gladiator ); break;
   case Service::colloseum:  _setType( walker::lionTamer );    break;
-  case Service::hippodrome:   _setType( walker::charioteer ); break;
-  case Service::market: _setType( walker::marketLady ); nameType = NameGenerator::female; break;
+  case Service::hippodrome: _setType( walker::charioteer ); break;
+  case Service::market:     _setType( walker::marketLady ); nameType = NameGenerator::female; break;
   case Service::missionary: _setType( walker::missioner ); break;
 
   case Service::library:
-  case Service::academy: _setType( walker::teacher ); break;
+  case Service::academy:    _setType( walker::teacher ); break;
 
   case Service::forum:
-  case Service::senate:  _setType( walker::taxCollector); break;
+  case Service::senate:     _setType( walker::taxCollector); break;
 
   default:
   break;
@@ -128,6 +143,7 @@ void ServiceWalker::_computeWalkerPath( int orders )
   Propagator pathPropagator( _city() );
   pathPropagator.init( ptr_cast<Construction>( _d->base ) );
   pathPropagator.setAllDirections( false );
+  pathPropagator.setObsoleteOverlays( _d->obsoleteOvs );
 
   PathwayList pathWayList = pathPropagator.getWays(_d->maxDistance);
 
@@ -169,7 +185,7 @@ void ServiceWalker::_computeWalkerPath( int orders )
       ServiceWalker::ReachedBuildings reachedBuildings = getReachedBuildings( (*itTile)->pos() );
       foreach( it, reachedBuildings )
       {
-        if( (*it)->type() == building::house )
+        if( (*it)->type() == objects::house )
         {
           _d->lastHousePos = (*itTile)->pos();
         }
@@ -196,6 +212,7 @@ void ServiceWalker::_cancelPath()
   }
 }
 
+void ServiceWalker::_addObsoleteOverlay(TileOverlay::Type type) { _d->obsoleteOvs.insert( type ); }
 unsigned int ServiceWalker::reachDistance() const { return _d->reachDistance;}
 void ServiceWalker::setReachDistance(unsigned int value) { _d->reachDistance = value;}
 
@@ -354,7 +371,7 @@ void ServiceWalker::_brokePathway(TilePos p)
     Pathway way = PathwayHelper::create( pos(), ptr_cast<Construction>( base() ), PathwayHelper::roadFirst );
     if( way.isValid() )
     {
-      setPathway( way );
+      _updatePathway( way );
       go();
       return;
     }
@@ -379,7 +396,7 @@ void ServiceWalker::save( VariantMap& stream ) const
 {
   Walker::save( stream );
   stream[ "service" ] = Variant( ServiceHelper::getName( _d->service ) );
-  stream[ "base" ] = _d->base->pos();
+  stream[ "base" ] = _d->base.isValid() ? _d->base->pos() : TilePos( -1, -1 );
   VARIANT_SAVE_ANY_D( stream, _d, maxDistance )
   VARIANT_SAVE_ANY_D( stream, _d, reachDistance )
   VARIANT_SAVE_ANY_D( stream, _d, lastHousePos )
@@ -479,8 +496,32 @@ bool ServiceWalker::die()
   return false;
 }
 
+void ServiceWalker::initialize(const VariantMap& options)
+{
+  Human::initialize( options );
+
+  VariantList oboletesOvs = options.get( "obsoleteOverlays" ).toList();
+  foreach( it, oboletesOvs )
+  {
+    TileOverlay::Type ovType = MetaDataHolder::findType( it->toString() );
+    if( ovType != objects::unknown )
+      _addObsoleteOverlay( ovType );
+  }
+}
+
 void ServiceWalker::setMaxDistance( const int distance ) { _d->maxDistance = distance; }
 float ServiceWalker::serviceValue() const { return 100; }
+
+TilePos ServiceWalker::places(Walker::Place type) const
+{
+  switch( type )
+  {
+  case plOrigin: return base().isValid() ? base()->pos() : TilePos( -1, -1 );
+  default: break;
+  }
+
+  return Human::places( type );
+}
 
 ServiceWalkerPtr ServiceWalker::create(PlayerCityPtr city, const Service::Type service )
 {
@@ -491,3 +532,4 @@ ServiceWalkerPtr ServiceWalker::create(PlayerCityPtr city, const Service::Type s
 
 ServiceWalker::~ServiceWalker() {}
 void ServiceWalker::setBase( BuildingPtr base ) { _d->base = base; }
+WalkerPtr ServicemanCreator::create(PlayerCityPtr city) { return ServiceWalker::create( city, serviceType ).object();  }

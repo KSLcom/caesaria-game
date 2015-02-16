@@ -22,6 +22,7 @@
 #include "good/goodhelper.hpp"
 #include "city.hpp"
 #include "game/gamedate.hpp"
+#include "core/variant_map.hpp"
 #include "objects/house.hpp"
 #include "good/goodstore.hpp"
 #include "core/logger.hpp"
@@ -34,43 +35,47 @@ namespace city
 {
 
 namespace {
-CAESARIA_LITERALCONST(endTime)
 CAESARIA_LITERALCONST(good)
 }
 
 class GoodsUpdater::Impl
 {
 public:
+  typedef std::set<gfx::TileOverlay::Type> BuildingTypes;
+
   DateTime endTime;
   bool isDeleted;
-  Good::Type gtype;
+  good::Product gtype;
+  BuildingTypes supportBuildings;
+
   int value;
 };
 
 SrvcPtr GoodsUpdater::create( PlayerCityPtr city )
 {
-  GoodsUpdater* e = new GoodsUpdater( city );
-
-  SrvcPtr ret( e );
+  SrvcPtr ret( new GoodsUpdater( city ) );
   ret->drop();
 
   return ret;
 }
 
-void GoodsUpdater::update( const unsigned int time)
+void GoodsUpdater::timeStep(const unsigned int time)
 {
-  if( GameDate::isWeekChanged() )
+  if( game::Date::isWeekChanged() )
   {
-    _d->isDeleted = (_d->endTime < GameDate::current());
+    _d->isDeleted = (_d->endTime < game::Date::current());
 
     Logger::warning( "GoodsUpdater: execute service" );
-    Helper helper( &_city );
-    HouseList houses = helper.find<House>( building::house );
-    foreach( it, houses )
+    Helper helper( _city() );
+
+    foreach( bldType, _d->supportBuildings )
     {
-      int qty = 5 * (*it)->spec().level();
-      GoodStock stock( _d->gtype, qty, qty );
-      (*it)->goodStore().store( stock, qty );
+      BuildingList buildings = helper.find<Building>( *bldType );
+      foreach( it, buildings )
+      {
+        good::Stock stock( _d->gtype, _d->value, _d->value );
+        (*it)->storeGoods( stock, _d->value );
+      }
     }
   }
 }
@@ -79,26 +84,44 @@ bool GoodsUpdater::isDeleted() const {  return _d->isDeleted; }
 
 void GoodsUpdater::load(const VariantMap& stream)
 {
-  _d->endTime = stream.get( lc_endTime ).toDateTime();
-  VARIANT_LOAD_ANY_D( _d, value, stream );
-  _d->gtype = (Good::Type)GoodHelper::getType( stream.get( lc_good ).toString() );
+  VARIANT_LOAD_TIME_D( _d, endTime, stream )
+  VARIANT_LOAD_ANY_D( _d, value, stream )
+
+  _d->gtype = (good::Product)good::Helper::getType( stream.get( lc_good ).toString() );
+
+  VariantList vl_buildings = stream.get( "buildings" ).toList();
+  foreach( it, vl_buildings )
+  {
+    gfx::TileOverlay::Type type = MetaDataHolder::findType( it->toString() );
+    if( type != objects::unknown )
+    {
+      _d->supportBuildings.insert( type );
+    }
+  }
 }
 
 VariantMap GoodsUpdater::save() const
 {
   VariantMap ret;
-  ret[ lc_endTime ] = _d->endTime;
-  VARIANT_SAVE_ANY_D(ret, _d, value );
-  ret[ lc_good    ] = Variant( GoodHelper::getTypeName( _d->gtype ) );
+  VARIANT_SAVE_ANY_D( ret, _d, endTime )
+  VARIANT_SAVE_ANY_D( ret, _d, value )
+
+  VariantList vl_buildings;
+  foreach( it, _d->supportBuildings )
+  {
+    vl_buildings.push_back( Variant( MetaDataHolder::findTypename( (gfx::TileOverlay::Type)*it ) ));
+  }
+
+  ret[ lc_good    ] = Variant( good::Helper::getTypeName( _d->gtype ) );
 
   return ret;
 }
 
 std::string GoodsUpdater::defaultName() { return "goods_updater"; }
-Good::Type GoodsUpdater::goodType() const {  return _d->gtype; }
+good::Product GoodsUpdater::goodType() const {  return _d->gtype; }
 
 GoodsUpdater::GoodsUpdater( PlayerCityPtr city )
-  : Srvc( *city.object(), GoodsUpdater::defaultName() ), _d( new Impl )
+  : Srvc( city, GoodsUpdater::defaultName() ), _d( new Impl )
 {
   _d->isDeleted = false;
 }

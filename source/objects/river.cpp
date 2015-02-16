@@ -22,21 +22,24 @@
 #include "gfx/tilemap.hpp"
 #include "constants.hpp"
 #include "core/foreach.hpp"
+#include "objects_factory.hpp"
 
 using namespace constants;
 using namespace gfx;
+
+REGISTER_CLASS_IN_OVERLAYFACTORY(objects::river, River)
 
 namespace {
   static Renderer::PassQueue riftPassQueue=Renderer::PassQueue(1,Renderer::ground);
 }
 
-River::River() : TileOverlay( building::river, Size(1) )
+River::River() : TileOverlay( objects::river, Size(1) )
 {
 }
 
-bool River::build( PlayerCityPtr city, const TilePos& pos )
+bool River::build( const CityAreaInfo& info )
 {
-  TileOverlay::build( city, pos );
+  TileOverlay::build( info );
   setPicture( computePicture() );
 
   RiverList rifts = neighbors();

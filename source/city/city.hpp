@@ -27,14 +27,15 @@
 #include "objects/constants.hpp"
 #include "world/city.hpp"
 #include "walker/constants.hpp"
-
+#include "game/climate.hpp"
 
 namespace city
 {
-  class Funds;
-  class VictoryConditions;
-  class TradeOptions;
-  class BuildOptions;
+class Funds;
+class VictoryConditions;
+
+namespace trade { class Options; }
+namespace development { class Options; }
 }
 
 struct BorderInfo
@@ -47,22 +48,25 @@ struct BorderInfo
 
 class PlayerCity : public world::City
 {
-public:
+public:  
   typedef enum { adviserEnabled=0, godEnabled, fishPlaceEnabled, updateRoads,
-                 forceBuild, warningsEnabled, updateTiles } OptionType;
+                 forceBuild, warningsEnabled, updateTiles, zoomEnabled, zoomInvert } OptionType;
+
   static PlayerCityPtr create( world::EmpirePtr empire, PlayerPtr player );
   virtual ~PlayerCity();
 
   virtual void timeStep(unsigned int time);  // performs one simulation step
 
   WalkerList walkers(constants::walker::Type type );
-  WalkerList walkers(constants::walker::Type type, const TilePos& startPos, const TilePos& stopPos=TilePos( -1, -1 ) );
+  const WalkerList& walkers(const TilePos& pos);
+  const WalkerList& walkers() const;
 
   void addWalker( WalkerPtr walker );
 
   void addService( city::SrvcPtr service );
   city::SrvcPtr findService( const std::string& name ) const;
-  city::SrvcList services() const;
+
+  const city::SrvcList& services() const;
 
   gfx::TileOverlayList& overlays();
 
@@ -73,6 +77,7 @@ public:
   virtual bool isPaysTaxes() const;
   virtual bool haveOverduePayment() const;
   virtual DateTime lastAttack() const;
+  virtual world::Nation nation() const;
 
   PlayerPtr player() const;
   
@@ -101,28 +106,31 @@ public:
   void addOverlay( gfx::TileOverlayPtr overlay);
   gfx::TileOverlayPtr getOverlay( const TilePos& pos ) const;
 
-  const city::BuildOptions& buildOptions() const;
-  void setBuildOptions( const city::BuildOptions& options );
+  const city::development::Options& buildOptions() const;
+  void setBuildOptions( const city::development::Options& options );
+
+  virtual unsigned int age() const;
 
   const city::VictoryConditions& victoryConditions() const;
   void setVictoryConditions( const city::VictoryConditions& targets );
 
-  city::TradeOptions& tradeOptions();
+  city::trade::Options& tradeOptions();
 
   virtual void delayTrade(unsigned int month);
   virtual void addObject( world::ObjectPtr object );
-  virtual void empirePricesChanged(Good::Type gtype, int bCost, int sCost);
+  virtual void empirePricesChanged( good::Product gtype, int bCost, int sCost);
 
-  virtual const GoodStore& importingGoods() const;
-  virtual const GoodStore& exportingGoods() const;
+  virtual const good::Store& importingGoods() const;
+  virtual const good::Store& exportingGoods() const;
   virtual unsigned int tradeType() const;
 
   void setOption( OptionType opt, int value );
   int getOption( OptionType opt ) const;
 
   void clean();
+  void resize(unsigned int size );
    
-oc3_signals public:
+signals public:
   Signal1<int>& onPopulationChanged();
   Signal1<int>& onFundsChanged();
   Signal1<std::string>& onWarningMessage();

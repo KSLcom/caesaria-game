@@ -22,7 +22,10 @@
 #include "constants.hpp"
 #include "corpse.hpp"
 #include "ability.hpp"
+#include "city/helper.hpp"
+#include "core/variant_map.hpp"
 #include "game/resourcegroup.hpp"
+#include "core/logger.hpp"
 
 using namespace constants;
 
@@ -33,12 +36,19 @@ public:
 };
 
 Patrician::Patrician(PlayerCityPtr city )
-  : Walker( city ), _d( new Impl )
+  : Human( city ), _d( new Impl )
 {
   _setType( walker::patrician );
-  //_setAnimation( rand() % 100 ? gfx::patricianMove : gfx::patrician2Move );
 
   setName( _("##patrician##") );
+}
+
+PatricianPtr Patrician::create(PlayerCityPtr city)
+{
+  PatricianPtr ret( new Patrician( city ) );
+  ret->drop();
+
+  return ret;
 }
 
 Patrician::~Patrician()
@@ -60,7 +70,34 @@ void Patrician::load( const VariantMap& stream )
 
 void Patrician::_findNewWay( const TilePos& start )
 {
-  Pathway pathway = PathwayHelper::randomWay( _city(), start, 10 );
+  city::Helper helper( _city() );
+  std::vector< objects::Type > bTypes;
+  bTypes.push_back( objects::senate );
+
+  ConstructionList buildings;
+
+  foreach( it, bTypes )
+  {
+    buildings << helper.find<Construction>( *it );
+  }
+
+  Pathway pathway;
+
+  for( size_t k=0; k < std::min<size_t>( 3, buildings.size() ); k++ )
+  {
+    ConstructionPtr constr = buildings.random();
+    pathway = PathwayHelper::create( start, constr, PathwayHelper::roadOnly );
+
+    if( pathway.isValid() )
+    {
+      break;
+    }
+  }
+
+  if( !pathway.isValid() )
+  {
+    pathway = PathwayHelper::randomWay( _city(), start, 10 );
+  }
 
   if( pathway.isValid() )
   {
@@ -70,7 +107,21 @@ void Patrician::_findNewWay( const TilePos& start )
   }
   else
   {
+    Logger::warning( "Patrician: cant find way" );
     die();
+  }
+}
+
+void Patrician::_reachedPathway()
+{
+  if( _pathwayRef().isReverse() )
+  {
+    deleteLater();
+  }
+  else
+  {
+    _pathwayRef().toggleDirection();
+    go();
   }
 }
 

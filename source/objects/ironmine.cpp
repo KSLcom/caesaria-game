@@ -24,33 +24,33 @@
 #include "game/gamedate.hpp"
 #include "city/helper.hpp"
 #include "events/showinfobox.hpp"
+#include "objects_factory.hpp"
 
 using namespace gfx;
 using namespace constants;
 
-class IronMine::Impl
-{
-public:
-  unsigned int lowWorkerWeeksNumber;
-};
+REGISTER_CLASS_IN_OVERLAYFACTORY(objects::iron_mine, IronMine)
 
-IronMine::IronMine() : Factory(Good::none, Good::iron, building::ironMine, Size(2) ),
-  _d( new Impl )
+IronMine::IronMine()
+  : Factory(good::none, good::iron, objects::iron_mine, Size(2) )
 {
   setPicture( ResourceGroup::commerce, 54 );
 
   _animationRef().load( ResourceGroup::commerce, 55, 6 );
   _animationRef().setDelay( 5 );
   _fgPicturesRef().resize( 2 );
+
+  _setUnworkingInterval( 8 );
 }
 
-bool IronMine::canBuild( PlayerCityPtr city, TilePos pos, const TilesArray& aroundTiles ) const
+bool IronMine::canBuild( const CityAreaInfo& areaInfo ) const
 {
-  bool is_constructible = WorkingBuilding::canBuild( city, pos, aroundTiles );
+  bool is_constructible = WorkingBuilding::canBuild( areaInfo );
   bool near_mountain = false;  // tells if the factory is next to a mountain
 
-  Tilemap& tilemap = city->tilemap();
-  TilesArray perimetr = tilemap.getRectangle( pos + TilePos( -1, -1 ), pos + TilePos(3, 3), Tilemap::checkCorners );
+  Tilemap& tilemap = areaInfo.city->tilemap();
+  TilesArray perimetr = tilemap.getRectangle( areaInfo.pos + TilePos( -1, -1 ),
+                                              areaInfo.pos + TilePos(3, 3), Tilemap::checkCorners );
 
   foreach( it, perimetr ) { near_mountain |= (*it)->getFlag( Tile::tlRock ); }
 
@@ -62,36 +62,12 @@ bool IronMine::canBuild( PlayerCityPtr city, TilePos pos, const TilesArray& arou
 void IronMine::timeStep(const unsigned long time)
 {
   Factory::timeStep( time );
-
-  if( GameDate::isWeekChanged() )
-  {
-    if( numberWorkers() < maximumWorkers() / 3 )
-    {
-      _d->lowWorkerWeeksNumber++;
-    }
-    else
-    {
-      _d->lowWorkerWeeksNumber = std::max<int>( 0, _d->lowWorkerWeeksNumber-1 );
-    }
-
-    if( _d->lowWorkerWeeksNumber > 8 &&  _d->lowWorkerWeeksNumber > (unsigned int)math::random( 42 ) )
-    {
-      collapse();
-
-      events::GameEventPtr e = events::ShowInfobox::create( "##iron_mine_collapse##", "##iron_mine_collpase_by_low_support##");
-      e->dispatch();
-    }
-  }
 }
 
-void IronMine::save(VariantMap& stream) const
+void IronMine::_reachUnworkingTreshold()
 {
-  Factory::save( stream );
-  VARIANT_SAVE_ANY_D( stream, _d, lowWorkerWeeksNumber );
-}
+  Factory::_reachUnworkingTreshold();
 
-void IronMine::load(const VariantMap& stream)
-{
-  Factory::load( stream );
-  VARIANT_LOAD_ANY_D( _d, lowWorkerWeeksNumber, stream );
+  events::GameEventPtr e = events::ShowInfobox::create( "##iron_mine_collapse##", "##iron_mine_collpase_by_low_support##");
+  e->dispatch();
 }

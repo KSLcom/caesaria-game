@@ -24,10 +24,14 @@
 #include "objects/constants.hpp"
 #include "core/priorities.hpp"
 #include "core/logger.hpp"
+#include "core/variant_map.hpp"
 #include "pathway/pathway_helper.hpp"
+#include "walkers_factory.hpp"
 
 using namespace constants;
 using namespace gfx;
+
+REGISTER_TRAINEEMAN_IN_WALKERFACTORY(walker::trainee, 0, trainee)
 
 typedef Priorities<TileOverlay::Type> NecessaryBuildings;
 
@@ -42,7 +46,7 @@ public:
 };
 
 TraineeWalker::TraineeWalker(PlayerCityPtr city, walker::Type traineeType)
-  : Walker( city ), _d( new Impl )
+  : Human( city ), _d( new Impl )
 {
   _setType( traineeType );
   _d->maxDistance = 30;
@@ -53,17 +57,17 @@ void TraineeWalker::_init(walker::Type traineeType)
 {
   switch( traineeType )
   {
-  case walker::actor:     _d->necBuildings << building::theater
-                                           << building::amphitheater;  break;
-  case walker::gladiator:    _d->necBuildings << building::amphitheater
-                                              << building::colloseum;  break;
-  case walker::lionTamer:    _d->necBuildings << building::colloseum;  break;
-  case walker::soldier:    _d->necBuildings << building::militaryAcademy
-                                            << building::fortLegionaire
-                                            << building::fortMounted
-                                            << building::fortJavelin
-                                            << building::tower;  break;
-  case walker::charioteer:    _d->necBuildings << building::hippodrome;  break;
+  case walker::actor:      _d->necBuildings << objects::theater
+                                           << objects::amphitheater;  break;
+  case walker::gladiator:  _d->necBuildings << objects::amphitheater
+                                              << objects::colloseum;  break;
+  case walker::lionTamer:  _d->necBuildings << objects::colloseum;  break;
+  case walker::soldier:    _d->necBuildings << objects::military_academy
+                                            << objects::fort_legionaries
+                                            << objects::fort_horse
+                                            << objects::fort_javelin
+                                            << objects::tower;  break;
+  case walker::charioteer:  _d->necBuildings << objects::hippodrome;  break;
   default: break;
   }
 
@@ -167,7 +171,7 @@ void TraineeWalker::_computeWalkerPath( bool roadOnly )
 
 void TraineeWalker::checkDestination(const TileOverlay::Type buildingType, Propagator &pathPropagator)
 {
-  DirectRoutes pathWayList = pathPropagator.getRoutes( buildingType );
+  DirectPRoutes pathWayList = pathPropagator.getRoutes( buildingType );
 
   foreach( item, pathWayList )
   {
@@ -222,15 +226,27 @@ void TraineeWalker::load( const VariantMap& stream )
 {
   Walker::load(stream);
 
-  city::Helper helper( _city() );
-  _d->base = helper.find<Building>( building::any, stream.get( "originBldPos" ).toTilePos() );
-  _d->destination = helper.find<Building>( building::any, stream.get( "destBldPos" ).toTilePos() );
+  _d->base << _city()->getOverlay( stream.get( "originBldPos" ).toTilePos() );
+  _d->destination << _city()->getOverlay( stream.get( "destBldPos" ).toTilePos() );
   _d->maxDistance = (int)stream.get( "maxDistance" );
   walker::Type wtype = (walker::Type)stream.get( "traineeType" ).toInt();
 
   _setType( wtype );
   _init( wtype );
 }
+
+TilePos TraineeWalker::places(Walker::Place type) const
+{
+  switch( type )
+  {
+  case plOrigin: return _d->base.isValid() ? _d->base->pos() : TilePos( -1, -1 );
+  case plDestination: return _d->destination.isValid() ? _d->destination->pos() : TilePos( -1, -1 );
+  default: break;
+  }
+
+  return Human::places( type );
+}
+
 
 TraineeWalker::~TraineeWalker(){}
 
@@ -239,4 +255,9 @@ TraineeWalkerPtr TraineeWalker::create(PlayerCityPtr city, walker::Type traineeT
   TraineeWalkerPtr ret( new TraineeWalker( city, traineeType ) );
   ret->drop();
   return ret;
+}
+
+WalkerPtr TraineeWalkerCreator::create(PlayerCityPtr city)
+{
+  return TraineeWalker::create( city, walker::trainee ).object();
 }

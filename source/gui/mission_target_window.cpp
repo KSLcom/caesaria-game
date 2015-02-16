@@ -28,7 +28,7 @@
 #include "environment.hpp"
 #include "city/city.hpp"
 #include "core/foreach.hpp"
-#include "core/stringhelper.hpp"
+#include "core/utils.hpp"
 #include "city/victoryconditions.hpp"
 #include "core/logger.hpp"
 #include "gameautopause.hpp"
@@ -40,7 +40,10 @@ using namespace gfx;
 namespace gui
 {
 
-class MissionTargetsWindow::Impl
+namespace dialog
+{
+
+class MissionTargets::Impl
 {
 public:
   GameAutoPause locker;
@@ -57,17 +60,19 @@ public:
   ListBox* lbxHelp;
 };
 
-MissionTargetsWindow* MissionTargetsWindow::create(Widget* parent, PlayerCityPtr city, int id )
+MissionTargets* MissionTargets::create(Widget* parent, PlayerCityPtr city, int id )
 {
-  MissionTargetsWindow* ret = new MissionTargetsWindow( parent, id, Rect( 0, 0, 610, 430 ) );
+  MissionTargets* ret = new MissionTargets( parent, id, Rect( 0, 0, 610, 430 ) );
   ret->setCenter( parent->center() );
   ret->setCity( city );
+  ret->setModal();
+
   return ret;
 }
 
-MissionTargetsWindow::~MissionTargetsWindow() {}
+MissionTargets::~MissionTargets() {}
 
-MissionTargetsWindow::MissionTargetsWindow( Widget* parent, int id, const Rect& rectangle ) 
+MissionTargets::MissionTargets( Widget* parent, int id, const Rect& rectangle )
   : Window( parent, rectangle, "", id ), _d( new Impl )
 {
   Widget::setupUI( ":/gui/targets.gui" );
@@ -75,9 +80,8 @@ MissionTargetsWindow::MissionTargetsWindow( Widget* parent, int id, const Rect& 
 
   WidgetEscapeCloser::insertTo( this );
 
-  TexturedButton* btnExit;
-  GET_WIDGET_FROM_UI( btnExit )
-  CONNECT( btnExit, onClicked(), this, MissionTargetsWindow::deleteLater );
+  INIT_WIDGET_FROM_UI( TexturedButton*, btnExit )
+  CONNECT( btnExit, onClicked(), this, MissionTargets::deleteLater );
 
   GET_DWIDGET_FROM_UI( _d, lbTitle )
   GET_DWIDGET_FROM_UI( _d, lbPopulation )
@@ -89,7 +93,7 @@ MissionTargetsWindow::MissionTargetsWindow( Widget* parent, int id, const Rect& 
   GET_DWIDGET_FROM_UI( _d, lbxHelp )
 }
 
-void MissionTargetsWindow::draw( gfx::Engine& painter )
+void MissionTargets::draw( gfx::Engine& painter )
 {
   if( !visible() )
     return;
@@ -97,7 +101,7 @@ void MissionTargetsWindow::draw( gfx::Engine& painter )
   Window::draw( painter );
 }
 
-void MissionTargetsWindow::setCity(PlayerCityPtr city)
+void MissionTargets::setCity(PlayerCityPtr city)
 {
   _d->city = city;
   const city::VictoryConditions& wint = _d->city->victoryConditions();
@@ -108,34 +112,34 @@ void MissionTargetsWindow::setCity(PlayerCityPtr city)
 
   if( _d->lbProsperity )
   {
-    text = StringHelper::format( 0xff, "%s:%d", _("##senatepp_prsp_rating##"), wint.needProsperity() );
+    text = utils::format( 0xff, "%s:%d", _("##senatepp_prsp_rating##"), wint.needProsperity() );
     _d->lbProsperity->setText( text );
     _d->lbProsperity->setVisible( wint.needProsperity() > 0 );
   }
 
   if( _d->lbPopulation )
   {
-    text = StringHelper::format( 0xff, "%s:%d", _("##mission_wnd_population##"), wint.needPopulation() );
+    text = utils::format( 0xff, "%s:%d", _("##mission_wnd_population##"), wint.needPopulation() );
     _d->lbPopulation->setText( text );
   }
 
   if( _d->lbFavour )
   {
-    text = StringHelper::format( 0xff, "%s:%d", _("##senatepp_favour_rating##"), wint.needFavour() );
+    text = utils::format( 0xff, "%s:%d", _("##senatepp_favour_rating##"), wint.needFavour() );
     _d->lbFavour->setText( text );
     _d->lbFavour->setVisible( wint.needFavour() > 0 );
   }
 
   if( _d->lbCulture )
   {
-    text = StringHelper::format( 0xff, "%s:%d", _("##senatepp_clt_rating##"), wint.needCulture() );
+    text = utils::format( 0xff, "%s:%d", _("##senatepp_clt_rating##"), wint.needCulture() );
     _d->lbCulture->setText( text );
     _d->lbCulture->setVisible( wint.needCulture() > 0 );
   }
 
   if( _d->lbPeace )
   {
-    text = StringHelper::format( 0xff, "%s:%d", _("##senatepp_peace_rating##"), wint.needPeace() );
+    text = utils::format( 0xff, "%s:%d", _("##senatepp_peace_rating##"), wint.needPeace() );
     _d->lbPeace->setText( text );
     _d->lbPeace->setVisible( wint.needPeace() > 0 );
   }
@@ -167,5 +171,7 @@ void MissionTargetsWindow::setCity(PlayerCityPtr city)
     _d->lbShortDesc->setVisible( !wint.shortDesc().empty() );
   }
 }
+
+}//end namespace dialog
 
 }//end namespace gui

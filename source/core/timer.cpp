@@ -18,12 +18,10 @@
 
 #include "timer.hpp"
 #include "city/cityservice_timers.hpp"
-#include "core/stringhelper.hpp"
+#include "core/utils.hpp"
 #include "core/logger.hpp"
 #include <SDL_cpuinfo.h>
 #include <SDL_timer.h>
-
-#define CAESARIA_USE_DEBUGTIMERS
 
 class Timer::Impl
 {
@@ -34,7 +32,7 @@ public:
   bool loop;
   bool isActive;
 
-oc3_signals public:
+signals public:
   Signal1<int> onTimeoutASignal;
   Signal0<> onTimeoutSignal;
 };
@@ -71,8 +69,8 @@ void Timer::update( unsigned int time )
 
   if( _d->isActive && ( time - _d->startTime > _d->time) )
   {
-    oc3_emit _d->onTimeoutASignal( _d->id );
-    oc3_emit _d->onTimeoutSignal();
+    emit _d->onTimeoutASignal( _d->id );
+    emit _d->onTimeoutSignal();
 
     _d->isActive = false;
 
@@ -112,35 +110,34 @@ unsigned int DebugTimer::ticks()
 
 void DebugTimer::reset(const std::string &name)
 {
-  unsigned int namehash = StringHelper::hash( name );
-  instance()._d->timers[ namehash ].time = SDL_GetCPUCount();
+  unsigned int namehash = utils::hash( name );
+  instance()._d->timers[ namehash ].time = SDL_GetPerformanceCounter();
 }
 
 unsigned int DebugTimer::take(const std::string &name, bool reset)
 {
-  unsigned int namehash = StringHelper::hash( name );
+  unsigned int namehash = utils::hash( name );
   Impl::TimerInfo& tinfo = instance()._d->timers[ namehash ];
 
   unsigned int ret = tinfo.time;
   if( reset )
-    tinfo.time = SDL_GetCPUCount();
+    tinfo.time = SDL_GetPerformanceCounter();
 
   return ret;
 }
 
 unsigned int DebugTimer::delta(const std::string &name, bool reset)
 {
-  unsigned int namehash = StringHelper::hash( name );
+  unsigned int namehash = utils::hash( name );
   Impl::TimerInfo& tinfo = instance()._d->timers[ namehash ];
 
-  unsigned int ret = SDL_GetCPUCount() - tinfo.time;
+  unsigned int ret = SDL_GetPerformanceCounter() - tinfo.time;
   if( reset )
-    tinfo.time = SDL_GetCPUCount();
+    tinfo.time = SDL_GetPerformanceCounter();
 
   return ret;
 }
 
-#undef CAESARIA_USE_DEBUGTIMERS
 void DebugTimer::check(const std::string& prefix, const std::string &name)
 {
 #ifdef CAESARIA_USE_DEBUGTIMERS

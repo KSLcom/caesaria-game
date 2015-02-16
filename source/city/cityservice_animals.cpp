@@ -21,6 +21,7 @@
 #include "game/gamedate.hpp"
 #include "gfx/tilemap.hpp"
 #include "walker/animals.hpp"
+#include "core/variant_map.hpp"
 #include "walker/constants.hpp"
 #include "walker/helper.hpp"
 #include "walker/walkers_factory.hpp"
@@ -41,27 +42,30 @@ public:
   std::map< walker::Type, unsigned int > maxAnimal;
 };
 
-SrvcPtr Animals::create(PlayerCityPtr city)
+SrvcPtr Animals::create( PlayerCityPtr city )
 {
-  Animals* ret = new Animals( city );
+  SrvcPtr ret( new Animals( city ) );
+  ret->drop();
 
   return ret;
 }
 
 std::string Animals::defaultName() { return CAESARIA_STR_EXT(Animals); }
 
-void Animals::update(const unsigned int time)
+void Animals::timeStep(const unsigned int time)
 {
-  if( !GameDate::isMonthChanged() )
+  if( !game::Date::isMonthChanged() )
     return;
 
   if( _d->maxAnimal.empty() )
   {
-    walker::Type currentTerrainAnimal = _city.climate() == climateDesert ? walker::zebra : walker::sheep;
+    walker::Type currentTerrainAnimal = _city()->climate() == game::climate::desert
+                                          ? walker::zebra
+                                          : walker::sheep;
     _d->maxAnimal[ currentTerrainAnimal ] = defaultMaxAnimals;
   }
 
-  Tilemap& tmap = _city.tilemap();
+  Tilemap& tmap = _city()->tilemap();
   TilesArray border = tmap.getRectangle( TilePos( 0, 0 ), Size( tmap.size() ) );
   border = border.walkableTiles( true );
 
@@ -72,14 +76,14 @@ void Animals::update(const unsigned int time)
 
     if( maxAnimalInCity > 0 )
     {
-      WalkerList animals = _city.walkers( walkerType );
+      WalkerList animals = _city()->walkers( walkerType );
       if( animals.size() < maxAnimalInCity )
       {
-        AnimalPtr animal = ptr_cast<Animal>( WalkerManager::instance().create( walkerType, &_city ) );
+        AnimalPtr animal = ptr_cast<Animal>( WalkerManager::instance().create( walkerType, _city() ) );
         if( animal.isValid() )
         {
           Tile* rndTile = border.random();
-          animal->send2City( rndTile->pos() );
+          animal->send2City( rndTile->epos() );
         }
       }
     }
@@ -117,8 +121,8 @@ void Animals::load(const VariantMap& stream)
   }
 }
 
-Animals::Animals( PlayerCityPtr city )
-  : Srvc( *city.object(), Animals::defaultName() ), _d( new Impl )
+Animals::Animals(PlayerCityPtr city)
+  : Srvc( city, Animals::defaultName() ), _d( new Impl )
 {
 }
 

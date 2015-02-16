@@ -18,12 +18,13 @@
 #ifndef __CAESARIA_TRAINEEWALKER_H_INCLUDED__
 #define __CAESARIA_TRAINEEWALKER_H_INCLUDED__
 
-#include "walker.hpp"
+#include "human.hpp"
+#include "walkers_factory_creator.hpp"
 
 class Propagator;
 
 /** This walker goes to work */
-class TraineeWalker : public Walker
+class TraineeWalker : public Human
 {
 public:
   static TraineeWalkerPtr create( PlayerCityPtr city, constants::walker::Type traineeType );
@@ -35,6 +36,8 @@ public:
 
   virtual void save( VariantMap& stream) const;
   virtual void load( const VariantMap& stream);
+
+  virtual TilePos places(Place type) const;
 
   virtual ~TraineeWalker();
 protected:
@@ -49,5 +52,17 @@ private:
   class Impl;
   ScopedPtr< Impl > _d;
 };
+
+class TraineeWalkerCreator : public WalkerCreator
+{
+public:
+  virtual WalkerPtr create( PlayerCityPtr city );
+};
+
+#define REGISTER_TRAINEEMAN_IN_WALKERFACTORY(type,trainee,a) \
+namespace { \
+struct Registrator_##a { Registrator_##a() { WalkerManager::instance().addCreator( type, new TraineeWalkerCreator() ); }}; \
+static Registrator_##a rtor_##a; \
+}
 
 #endif //__CAESARIA_TRAINEEWALKER_H_INCLUDED__

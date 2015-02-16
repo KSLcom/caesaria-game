@@ -22,12 +22,16 @@
 #include "objects/house.hpp"
 #include "events/dispatcher.hpp"
 #include "core/logger.hpp"
+#include "core/variant_map.hpp"
 #include "objects/well.hpp"
+#include "factory.hpp"
 
 using namespace constants;
 
 namespace events
 {
+
+REGISTER_EVENT_IN_FACTORY(ContaminatedWater, "contaminated_water")
 
 class ContaminatedWater::Impl
 {
@@ -45,7 +49,7 @@ GameEventPtr ContaminatedWater::create()
   return ret;
 }
 
-void _decreaseHousesHealth( building::Type btype, PlayerCityPtr city, int value )
+void _decreaseHousesHealth( objects::Type btype, PlayerCityPtr city, int value )
 {
   city::Helper helper( city );
   TilePos offset( 2, 2 );
@@ -57,7 +61,7 @@ void _decreaseHousesHealth( building::Type btype, PlayerCityPtr city, int value 
     if( (*itB)->type() != btype )
         continue;
 
-    HouseList houses = helper.find<House>( building::house, (*itB)->pos() - offset, (*itB)->pos() + offset );
+    HouseList houses = helper.find<House>( objects::house, (*itB)->pos() - offset, (*itB)->pos() + offset );
 
     foreach( itHouse, houses )
     {
@@ -70,13 +74,13 @@ void _decreaseHousesHealth( building::Type btype, PlayerCityPtr city, int value 
 
 void ContaminatedWater::_exec( Game& game, unsigned int time)
 {
-  if( GameDate::isWeekChanged() )
+  if( game::Date::isWeekChanged() )
   {
     Logger::warning( "Execute contaminated water service" );
-    _d->isDeleted = _d->endDate < GameDate::current();
+    _d->isDeleted = _d->endDate < game::Date::current();
 
-    _decreaseHousesHealth( building::well, game.city(), -_d->value );
-    _decreaseHousesHealth( building::fountain, game.city(), -_d->value );
+    _decreaseHousesHealth( objects::well, game.city(), -_d->value );
+    _decreaseHousesHealth( objects::fountain, game.city(), -_d->value );
   }
 }
 

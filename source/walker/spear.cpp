@@ -21,9 +21,12 @@
 #include "game/resourcegroup.hpp"
 #include "gfx/tilemap.hpp"
 #include "core/foreach.hpp"
+#include "walkers_factory.hpp"
 
 using namespace constants;
 using namespace gfx;
+
+REGISTER_CLASS_IN_WALKERFACTORY(walker::spear, Spear)
 
 SpearPtr Spear::create(PlayerCityPtr city)
 {
@@ -35,16 +38,16 @@ SpearPtr Spear::create(PlayerCityPtr city)
 
 void Spear::_onTarget()
 {
-  WalkerList walkers = _city()->walkers( walker::any, dstPos() );
+  const WalkerList& walkers = _city()->walkers( dstPos() );
   foreach( w, walkers )
   {
     (*w)->updateHealth( -10 );
     (*w)->acceptAction( Walker::acFight, startPos() );
   }
 
-  TileOverlayPtr overlay = _city()->getOverlay( dstPos() );
+  ConstructionPtr c;
+  c << _city()->getOverlay( dstPos() );
 
-  ConstructionPtr c = ptr_cast<Construction>( overlay );
   if( c.isValid() )
   {
     c->updateState( Construction::damage, 5 );

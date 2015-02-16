@@ -18,10 +18,10 @@
 #ifndef __CAESARIA_RIOTER_H_INCLUDE_
 #define __CAESARIA_RIOTER_H_INCLUDE_
 
-#include "walker.hpp"
+#include "human.hpp"
 #include "objects/constants.hpp"
 
-class Rioter : public Walker
+class Rioter : public Human
 {
 public:
   static RioterPtr create( PlayerCityPtr city );
@@ -36,12 +36,12 @@ public:
   virtual void load(const VariantMap &stream);
 
   virtual int agressive() const;
-  virtual void excludeAttack( constants::building::Group group );
+  virtual void excludeAttack( constants::objects::Group group );
 
 protected:
   Rioter( PlayerCityPtr city );
   virtual void _reachedPathway();
-  virtual void _updateThinks();
+  virtual void _updateThoughts();
 
 private:
   class Impl;

@@ -25,14 +25,18 @@
 #include "core/logger.hpp"
 #include "walker/animals.hpp"
 #include "walker/helper.hpp"
+#include "core/variant_map.hpp"
 #include "walker/walkers_factory.hpp"
 #include "gfx/tilemap.hpp"
+#include "factory.hpp"
 
 using namespace constants;
 using namespace gfx;
 
 namespace events
 {
+
+REGISTER_EVENT_IN_FACTORY(RandomAnimals, "random_animals")
 
 class RandomAnimals::Impl
 {
@@ -55,7 +59,7 @@ GameEventPtr RandomAnimals::create( walker::Type type, unsigned int wolvesNumber
 {
   RandomAnimals* r = new RandomAnimals();
   r->_d->count = wolvesNumber;
-  r->_d->count = type;
+  r->_d->animalType = type;
 
   GameEventPtr ret( r );
   ret->drop();

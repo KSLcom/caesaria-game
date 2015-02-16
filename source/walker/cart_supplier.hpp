@@ -18,34 +18,34 @@
 #ifndef __CAESARIA_CART_SUPPLIER_H_INCLUDED__
 #define __CAESARIA_CART_SUPPLIER_H_INCLUDED__
 
-#include "walker.hpp"
+#include "human.hpp"
 #include "core/predefinitions.hpp"
 
 /** This walker delivers goods */
-class CartSupplier : public Walker
+class CartSupplier : public Human
 {
 public:
   static CartSupplierPtr create( PlayerCityPtr city );
 
   void setDestinationBuilding( BuildingPtr building );
   void setBaseBuilding( BuildingPtr building );
-  
-  virtual const gfx::Picture& getCartPicture();
-  
+    
   virtual void getPictures( gfx::Pictures& oPics);
 
-  void send2city(BuildingPtr building, Good::Type what, const int qty );
+  void send2city(BuildingPtr building, good::Product what, const int qty );
 
-  void computeWalkerDestination( BuildingPtr building, const Good::Type type, const int qty );
+  void computeWalkerDestination( BuildingPtr building, const good::Product type, const int qty );
  
   virtual void save(VariantMap& stream) const;
   virtual void load(const VariantMap& stream);
   virtual bool die();
 
   virtual void timeStep(const unsigned long time);
+  virtual TilePos places(Place type) const;
 
 protected:
   CartSupplier( PlayerCityPtr city );
+  virtual const gfx::Animation& _cart();
   virtual void _changeDirection();
   virtual void _reachedPathway();
 

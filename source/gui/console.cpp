@@ -3,7 +3,8 @@
 #include "environment.hpp"
 #include "core/saveadapter.hpp"
 #include "gfx/engine.hpp"
-#include "core/stringhelper.hpp"
+#include "core/utils.hpp"
+#include "core/variant_map.hpp"
 #include "core/event.hpp"
 
 namespace gui
@@ -41,14 +42,14 @@ void Console::SaveCommands_()																	//
     commands[ *it ] = "";
   }
 
-  SaveAdapter::save( commands, path );
+  config::save( commands, path );
 }
 
 void Console::LoadSaveCommands_()													//
 {
   vfs::Path path( ":/commands.model" );					//
 
-  VariantMap commands = SaveAdapter::load( path );
+  VariantMap commands = config::load( path );
   foreach( it, commands )
 	{
     console_history_.push_back( it->first );
@@ -251,7 +252,7 @@ void Console::inputChar_( unsigned int key_char, bool shift_down )		//
     std::string astr = buf;
 		
     //if(shift_down)
-    //  astr = StringHelper::localUpper( astr );
+    //  astr = utils::localUpper( astr );
 		
     currentCommand_ = currentCommand_.substr( 0, cursorPos_-1 ) + astr + currentCommand_.substr( cursorPos_-1, 0xff );
 		cursorPos_++;

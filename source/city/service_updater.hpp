@@ -29,7 +29,7 @@ class ServiceUpdater : public Srvc
 {
 public:
   static SrvcPtr create(PlayerCityPtr city);
-  virtual void update( const unsigned int time);
+  virtual void timeStep( const unsigned int time);
   static std::string defaultName();
   virtual bool isDeleted() const;
 
@@ -37,7 +37,7 @@ public:
   virtual VariantMap save() const;
 
 private:
-  ServiceUpdater(PlayerCityPtr city);
+  ServiceUpdater( PlayerCityPtr city );
 
   class Impl;
   ScopedPtr<Impl> _d;

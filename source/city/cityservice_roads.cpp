@@ -43,45 +43,43 @@ public:
   int defaultDecreasePaved;
 
   DateTime lastTimeUpdate;
-  ScopedPtr< Propagator > propagator;
 
-  void updateRoadsAround( UpdateInfo info );
+  void updateRoadsAround(Propagator& propagator, UpdateInfo info );
 };
 
 SrvcPtr Roads::create(PlayerCityPtr city)
 {
-  Roads* ret = new Roads( city );
-  return SrvcPtr( ret );
+  SrvcPtr ret( new Roads( city ) );
+  ret->drop();
+  return ret;
 }
 
 std::string Roads::defaultName(){  return "roads";}
 
-Roads::Roads(PlayerCityPtr city )
-  : Srvc( *city.object(), Roads::defaultName() ), _d( new Impl )
+Roads::Roads( PlayerCityPtr city )
+  : Srvc( city, Roads::defaultName() ), _d( new Impl )
 {
   _d->defaultIncreasePaved = 4;
   _d->defaultDecreasePaved = -1;
-  _d->lastTimeUpdate = GameDate::current();
-  _d->propagator.reset( new Propagator( city ) );
+  _d->lastTimeUpdate = game::Date::current();
 }
 
-void Roads::update( const unsigned int time )
+void Roads::timeStep( const unsigned int time )
 {
-  if( _d->lastTimeUpdate.month() == GameDate::current().month() )
+  if( _d->lastTimeUpdate.month() == game::Date::current().month() )
     return;
 
-  _d->lastTimeUpdate = GameDate::current();
+  _d->lastTimeUpdate = game::Date::current();
 
   std::vector< Impl::UpdateBuilding > btypes;
-  btypes.push_back( Impl::UpdateBuilding(building::senate, 10) );
-  btypes.push_back( Impl::UpdateBuilding(building::templeCeres, 4));
-  btypes.push_back( Impl::UpdateBuilding(building::templeMars, 4));
-  btypes.push_back( Impl::UpdateBuilding(building::templeMercury, 4));
-  btypes.push_back( Impl::UpdateBuilding(building::templeNeptune, 4));
-  btypes.push_back( Impl::UpdateBuilding(building::templeVenus, 4));
+  btypes.push_back( Impl::UpdateBuilding(objects::senate, 10) );
+  btypes.push_back( Impl::UpdateBuilding(objects::small_ceres_temple, 4));
+  btypes.push_back( Impl::UpdateBuilding(objects::small_mars_temple, 4));
+  btypes.push_back( Impl::UpdateBuilding(objects::small_mercury_temple, 4));
+  btypes.push_back( Impl::UpdateBuilding(objects::small_neptune_temple, 4));
+  btypes.push_back( Impl::UpdateBuilding(objects::small_venus_temple, 4));
 
-  Helper helper( &_city );
-
+  Helper helper( _city() );
 
   Impl::Updates positions;
   foreach( it, btypes )
@@ -94,7 +92,7 @@ void Roads::update( const unsigned int time )
     }
   }
 
-  HouseList houses = helper.find<House>( building::house );
+  HouseList houses = helper.find<House>( objects::house );
   foreach( house, houses )
   {
     if( (*house)->spec().level() >= HouseLevel::bigMansion )
@@ -103,11 +101,15 @@ void Roads::update( const unsigned int time )
     }
   }
 
-  foreach( upos, positions ) { _d->updateRoadsAround( *upos ); }
+  Propagator propagator( _city() );
+  foreach( upos, positions )
+  {
+    _d->updateRoadsAround( propagator, *upos );
+  }
 
   if( _d->lastTimeUpdate.month() % 3 == 1 )
   {
-    RoadList roads = helper.find<Road>( construction::road );
+    RoadList roads = helper.find<Road>( objects::road );
     foreach( road, roads )
     {
       (*road)->appendPaved( _d->defaultDecreasePaved );
@@ -117,10 +119,10 @@ void Roads::update( const unsigned int time )
 
 Roads::~Roads() {}
 
-void Roads::Impl::updateRoadsAround( UpdateInfo info )
+void Roads::Impl::updateRoadsAround( Propagator& propagator, UpdateInfo info )
 {
-  propagator->init( info.first );
-  PathwayList pathWayList = propagator->getWays( info.second );
+  propagator.init( info.first );
+  PathwayList pathWayList = propagator.getWays( info.second );
 
   foreach( current, pathWayList )
   {

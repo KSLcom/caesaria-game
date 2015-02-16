@@ -31,28 +31,28 @@ namespace infobox
 class AboutFontain : public AboutConstruction
 {
 public:
-   AboutFontain( Widget* parent, const gfx::Tile& tile );
+   AboutFontain( Widget* parent, PlayerCityPtr city, const gfx::Tile& tile );
    virtual ~AboutFontain();
 
-   virtual void showDescription();
+   virtual void _showHelp();
 };
 
 class AboutWell : public AboutConstruction
 {
 public:
-  AboutWell( Widget* parent, const gfx::Tile& tile );
+  AboutWell( Widget* parent, PlayerCityPtr city, const gfx::Tile& tile );
   virtual ~AboutWell();
 
-  virtual void showDescription();
+  virtual void _showHelp();
 };
 
 class AboutReservoir : public AboutConstruction
 {
 public:
-  AboutReservoir( Widget* parent, const gfx::Tile& tile );
+  AboutReservoir( Widget* parent, PlayerCityPtr city, const gfx::Tile& tile );
   virtual ~AboutReservoir();
 
-  virtual void showDescription();
+  virtual void _showHelp();
 };
 
 }

@@ -23,15 +23,21 @@
 #include "gfx/tile.hpp"
 #include "core/variant.hpp"
 #include "city/helper.hpp"
+#include "gfx/helper.hpp"
 #include "pathway/path_finding.hpp"
 #include "gfx/tilemap.hpp"
 #include "name_generator.hpp"
 #include "objects/constants.hpp"
+#include "city/migration.hpp"
 #include "game/resourcegroup.hpp"
 #include "corpse.hpp"
+#include "core/variant_map.hpp"
+#include "walkers_factory.hpp"
 
 using namespace constants;
 using namespace gfx;
+
+REGISTER_CLASS_IN_WALKERFACTORY(walker::emigrant, Emigrant)
 
 namespace  {
 CAESARIA_LITERALCONST(peoples)
@@ -40,26 +46,52 @@ CAESARIA_LITERALCONST(peoples)
 class Emigrant::Impl
 {
 public:
-  Picture cartPicture;
+  Animation cart;
   CitizenGroup peoples;
   int failedWayCount;
+  TilePos housePosLock;
+  bool cartBackward;
+  bool leaveCity;
   float stamina;
 
+public:
   void mayWalk( const Tile* tile, bool& ret )
   {
     HousePtr f = ptr_cast<House>( tile->overlay() );
     ret = ( tile->isWalkable( true ) || f.isValid() );
-  }
+  }  
 };
 
 Emigrant::Emigrant(PlayerCityPtr city )
-  : Walker( city ), _d( new Impl )
+  : Human( city ), _d( new Impl )
 {
   _setType( walker::emigrant );
 
   setName( NameGenerator::rand( NameGenerator::male ) );
   _d->stamina = math::random( 80 ) + 20;
   _d->failedWayCount = 0;
+  _d->leaveCity = false;
+  _d->cartBackward = true;
+  _d->housePosLock = TilePos( -1, -1 );
+}
+
+void Emigrant::_lockHouse( HousePtr house )
+{
+  if( _d->housePosLock.i() >= 0 )
+  {
+    HousePtr oldHouse = ptr_cast<House>( _city()->tilemap().at( _d->housePosLock ).overlay() );
+    if( oldHouse.isValid() )
+    {
+      _d->housePosLock = TilePos( -1, -1 );
+      oldHouse->setState( House::settleLock, 0 );
+    }
+  }
+
+  if( house.isValid() )
+  {
+    _d->housePosLock = house->pos();
+    house->setState( House::settleLock, tile::hash( _d->housePosLock ) );
+  }
 }
 
 HousePtr Emigrant::_findBlankHouse()
@@ -69,14 +101,15 @@ HousePtr Emigrant::_findBlankHouse()
   HousePtr blankHouse;
 
   TilePos offset( 5, 5 );
-  HouseList houses = hlp.find<House>( building::house, pos() - offset, pos() + offset );
+  HouseList houses = hlp.find<House>( objects::house, pos() - offset, pos() + offset );
+
   _checkHouses( houses );
+
   if( houses.empty() )
   {
-    houses = hlp.find<House>( building::house );
+    houses = hlp.find<House>( objects::house );
     _checkHouses( houses );
   }
-
 
   if( houses.size() > 0 )
   {
@@ -93,9 +126,19 @@ Pathway Emigrant::_findSomeWay( TilePos startPoint )
 
   Pathway pathway;
   if( house.isValid() )
-  {
-    pathway = PathwayHelper::create( startPoint, ptr_cast<Construction>(house),
-                                     PathwayHelper::roadFirst  );
+  {    
+    pathway = PathwayHelper::create( startPoint, house->pos(), PathwayHelper::roadFirst  );
+
+    if( !pathway.isValid() )
+    {
+      pathway = PathwayHelper::create( startPoint, ptr_cast<Construction>(house),
+                                       PathwayHelper::roadFirst  );
+    }
+
+    if( pathway.isValid() )
+    {
+      _lockHouse( house );
+    }
   }
 
   if( !pathway.isValid() || _d->failedWayCount > 10 )
@@ -115,6 +158,14 @@ void Emigrant::_reachedPathway()
 
   if( pos() == _city()->borderInfo().roadExit )
   {
+    city::MigrationPtr migration;
+    migration << _city()->findService( city::Migration::defaultName() );
+
+    if( migration.isValid() )
+    {
+      migration->citizenLeaveCity( this );
+    }
+
     deleteLater();
     return;
   }
@@ -158,6 +209,7 @@ void Emigrant::_append2house( HousePtr house )
   if( freeRoom > 0 )
   {
     house->addHabitants( _d->peoples );
+    _lockHouse( HousePtr() );
   }
 }
 
@@ -168,10 +220,19 @@ bool Emigrant::_checkNearestHouse()
   for( int k=1; k < 3; k++ )
   {
     TilePos offset( k, k );
-    HouseList houses = helper.find<House>( building::house, pos()-offset, pos() + offset );
-    foreach( it, houses )  //have destination
+    HouseList houses = helper.find<House>( objects::house, pos()-offset, pos() + offset );
+
+    std::map< int, HousePtr > vacantRoomPriority;
+    foreach( it, houses )
     {
       HousePtr house = *it;
+      unsigned int freeRoom = house->maxHabitants() - house->habitants().count();
+      vacantRoomPriority[ 1000 - freeRoom ] = house;
+    }
+
+    foreach( it, vacantRoomPriority )  //have destination
+    {
+      HousePtr house = it->second;
 
       int freeRoom = house->maxHabitants() - house->habitants().count();
       if( freeRoom > 0 )
@@ -228,13 +289,47 @@ void Emigrant::_noWay()
     _d->failedWayCount = 0;
     setPathway( someway );
     go();
+    }
+}
+
+bool Emigrant::_isCartBackward() const { return _d->cartBackward; }
+
+void Emigrant::_splitHouseFreeRoom(HouseList& moreRooms, HouseList& lessRooms )
+{
+  lessRooms.clear();
+
+  unsigned int myPeoples = _d->peoples.count();
+
+  HouseList::iterator itHouse = moreRooms.begin();
+  while( itHouse != moreRooms.end() )
+  {
+    HousePtr house = *itHouse;
+    unsigned int freeRoom = house->maxHabitants() - house->habitants().count();
+    if( freeRoom > 0 )
+    {
+      if( freeRoom > myPeoples )
+      {
+        ++itHouse;
+      }
+      else
+      {
+        lessRooms.push_back( *itHouse );
+        itHouse = moreRooms.erase( itHouse );
+      }
+    }
+    else
+    {
+      itHouse = moreRooms.erase( itHouse );
+    }
   }
 }
 
-void Emigrant::_checkHouses(HouseList &hlist)
+void Emigrant::_findFinestHouses(HouseList& hlist)
 {
   HouseList::iterator itHouse = hlist.begin();
   bool bigcity = _city()->population() > 300;
+  unsigned int houseLockId = tile::hash( _d->housePosLock );
+
   while( itHouse != hlist.end() )
   {
     HousePtr house = *itHouse;
@@ -246,8 +341,41 @@ void Emigrant::_checkHouses(HouseList &hlist)
       normalDesirability = (house->tile().param( Tile::pDesirability ) > -10);
     }
 
-    if( haveRoad && haveVacantRoom && normalDesirability) { ++itHouse; }
+    unsigned int settleLockId = house->state( House::settleLock );
+    if( settleLockId == houseLockId )
+    {
+      hlist.clear();
+      hlist.push_back( house );
+      return;
+    }
+
+    bool freeForSettle = ( 0 == settleLockId);
+
+    if( freeForSettle && haveRoad && haveVacantRoom && normalDesirability) { ++itHouse; }
     else { itHouse = hlist.erase( itHouse ); }
+  }
+}
+
+void Emigrant::_checkHouses(HouseList &hlist)
+{
+  if( hlist.empty() )
+    return;
+
+  HouseList lessRoomHouses;
+  _splitHouseFreeRoom( hlist, lessRoomHouses );
+
+  if( !hlist.empty() )
+  {
+    _findFinestHouses( hlist );
+  }
+
+  if( !hlist.empty() )
+    return;
+
+  if( !lessRoomHouses.empty() )
+  {
+    _findFinestHouses( lessRoomHouses );
+    hlist = lessRoomHouses;
   }
 }
 
@@ -281,7 +409,7 @@ bool Emigrant::send2city( const Tile& startTile )
   if( way.isValid() )
   {
     setPathway( way );
-    _city()->addWalker( this );
+    attach();
     return true;
   }
   else
@@ -291,7 +419,7 @@ bool Emigrant::send2city( const Tile& startTile )
   }
 }
 
-void Emigrant::leaveCity( const Tile& tile)
+void Emigrant::leaveCity( const Tile& tile )
 {
   setPos( tile.pos() );
   Pathway pathway = PathwayHelper::create( tile.pos(),
@@ -304,17 +432,21 @@ void Emigrant::leaveCity( const Tile& tile)
     return;
   }
 
-  _city()->addWalker( this );
+  attach();
+  _d->leaveCity = true;
   setPathway( pathway );
   go();
 }
 
 
-Emigrant::~Emigrant(){}
+Emigrant::~Emigrant()
+{
+  _lockHouse( HousePtr() );
+}
 
-void Emigrant::_setCartPicture( const Picture& pic ){  _d->cartPicture = pic;}
-const Picture& Emigrant::_cartPicture(){  return _d->cartPicture;}
-const CitizenGroup& Emigrant::_getPeoples() const{  return _d->peoples;}
+void Emigrant::_setCart( const Animation& anim ){  _d->cart = anim;}
+Animation& Emigrant::_cart(){  return _d->cart; }
+const CitizenGroup& Emigrant::peoples() const{  return _d->peoples;}
 void Emigrant::setPeoples( const CitizenGroup& peoples ){  _d->peoples = peoples;}
 
 void Emigrant::timeStep(const unsigned long time)
@@ -335,11 +467,15 @@ void Emigrant::timeStep(const unsigned long time)
     _d->stamina = math::clamp( _d->stamina+1, 0.f, 100.f );
     if( _d->stamina >= 100 )
     {
-      Pathway way = _findSomeWay( pos() );
-      if( way.isValid() )
+      if( !_d->leaveCity )
       {
-        _updatePathway( way );
+        Pathway way = _findSomeWay( pos() );
+        if( way.isValid() )
+        {
+          _updatePathway( way );
+        }
       }
+
       go();
     }
   break;
@@ -347,6 +483,19 @@ void Emigrant::timeStep(const unsigned long time)
   default:
   break;
   }
+
+  _d->cart.update( time );
+}
+
+TilePos Emigrant::places(Walker::Place type) const
+{
+  switch( type )
+  {
+  case plDestination: return _d->housePosLock;
+  default: break;
+  }
+
+  return Human::places( type );
 }
 
 void Emigrant::save( VariantMap& stream ) const
@@ -373,5 +522,14 @@ bool Emigrant::die()
     return true;
   }
 
+  _lockHouse( HousePtr() );
+
   return created;
+}
+
+void Emigrant::initialize(const VariantMap &options)
+{
+  Human::initialize( options );
+
+  _d->cartBackward = options.get( "cartBackward", _d->cartBackward );
 }

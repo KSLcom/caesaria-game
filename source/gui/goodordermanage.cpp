@@ -21,15 +21,16 @@
 #include "core/gettext.hpp"
 #include "good/goodhelper.hpp"
 #include "label.hpp"
-#include "city/helper.hpp"
 #include "objects/factory.hpp"
+#include "city/helper.hpp"
 #include "gfx/engine.hpp"
 #include "widget_helper.hpp"
 #include "core/logger.hpp"
-#include "core/stringhelper.hpp"
+#include "core/utils.hpp"
 
 using namespace constants;
 using namespace gfx;
+using namespace city;
 
 namespace gui
 {
@@ -58,47 +59,52 @@ public:
 
     switch( order )
     {
-      case city::TradeOptions::importing:
-      case city::TradeOptions::noTrade:
+      case trade::noTrade:
       {
         btnDecrease->hide();
         btnIncrease->hide();
 
         Font f = font( _state() );
-        std::string text = (order == city::TradeOptions::importing ? _("##trade_btn_import_text##") : _("##trade_btn_notrade_text##"));
+        std::string text = _("##trade_btn_notrade_text##");
         Rect textRect = f.getTextRect( text, Rect( Point( 0, 0), size() ), horizontalTextAlign(), verticalTextAlign() );
         f.draw( *_textPictureRef(), text, textRect.UpperLeftCorner );
       }
       break;
 
-      case city::TradeOptions::exporting:
-        {
-          btnDecrease->show();
-          btnIncrease->show();
+      case trade::importing:
+      case trade::exporting:
+      {
+        btnDecrease->show();
+        btnIncrease->show();
 
-          Font f = font( _state() );
-          std::string text = _("##trade_btn_export_text##");
-          Rect textRect = f.getTextRect( text, Rect( 0, 0, width() / 2, height() ), horizontalTextAlign(), verticalTextAlign() );
-          f.draw( *_textPictureRef(), text, textRect.UpperLeftCorner, true );
+        Font f = font( _state() );
+        std::string text = (order == trade::importing ? "##trade_btn_import_text##" : "##trade_btn_export_text##");
+        Rect textRect = f.getTextRect( _(text), Rect( 0, 0, width() / 2, height() ), horizontalTextAlign(), verticalTextAlign() );
+        f.draw( *_textPictureRef(), _(text), textRect.UpperLeftCorner, true );
 
-          text = StringHelper::format( 0xff, "%d %s", goodsQty, _("##trade_btn_qty##") );
-          textRect = f.getTextRect( text, Rect( width() / 2 + 24 * 2, 0, width(), height() ), horizontalTextAlign(), verticalTextAlign() );
-          f.draw( *_textPictureRef(), text, textRect.UpperLeftCorner, true );
-        }
+        text = utils::format( 0xff, "%d %s", goodsQty, _("##trade_btn_qty##") );
+        textRect = f.getTextRect( text, Rect( width() / 2 + 24 * 2, 0, width(), height() ), horizontalTextAlign(), verticalTextAlign() );
+        f.draw( *_textPictureRef(), text, textRect.UpperLeftCorner, true );
+      }
       break;
 
       default: break;
     }
   }
 
-  void setTradeState( city::TradeOptions::Order o, int qty )
+  void update()
+  {
+    _resizeEvent();
+  }
+
+  void setTradeState( trade::Order o, int qty )
   {
     order = o;
     goodsQty = qty;
     _resizeEvent();
   }
 
-  city::TradeOptions::Order order;
+  trade::Order order;
   int goodsQty;
   TexturedButton* btnDecrease;
   TexturedButton* btnIncrease;
@@ -108,45 +114,50 @@ class GoodOrderManageWindow::Impl
 {
 public:
   PlayerCityPtr city;
-  Good::Type type;
+  good::Product type;
   TradeStateButton* btnTradeState;
   PushButton* btnIndustryState;
   Label* lbIndustryInfo;
   Picture icon;
+  GoodOrderManageWindow::GoodMode gmode;
   PushButton* btnStackingState;
 
-oc3_signals public:
+signals public:
   Signal0<> onOrderChangedSignal;
 };
 
-GoodOrderManageWindow::GoodOrderManageWindow(Widget *parent, const Rect &rectangle, PlayerCityPtr city, Good::Type type, int stackedGoods)
+GoodOrderManageWindow::GoodOrderManageWindow(Widget *parent, const Rect &rectangle, PlayerCityPtr city,
+                                             good::Product type, int stackedGoods, GoodMode gmode )
   : Window( parent, rectangle, "" ), _d( new Impl )
 {  
   _d->city = city;
   _d->type = type;
+  _d->gmode = gmode;
 
   setupUI( ":/gui/goodorder.gui" );
 
-  _d->icon = GoodHelper::picture( type );
+  _d->icon = good::Helper::picture( type );
 
-  Label* lbTitle;
-  Label* lbStackedQty;
-  TexturedButton* btnExit;
-  GET_WIDGET_FROM_UI( lbTitle )
-  GET_WIDGET_FROM_UI( lbStackedQty )
-  GET_WIDGET_FROM_UI( btnExit )
+  INIT_WIDGET_FROM_UI( Label*, lbTitle )
+  INIT_WIDGET_FROM_UI( Label*, lbStackedQty )
+  INIT_WIDGET_FROM_UI( TexturedButton*, btnExit )
   GET_DWIDGET_FROM_UI( _d, lbIndustryInfo )
   GET_DWIDGET_FROM_UI( _d, btnIndustryState )
   GET_DWIDGET_FROM_UI( _d, btnStackingState )
 
-  if( lbTitle ) lbTitle->setText( GoodHelper::name( type ) );
+  if( lbTitle ) lbTitle->setText( _( good::Helper::name( type ) ) );
   if( lbStackedQty )
   {
-    std::string text = StringHelper::format( 0xff, "%d %s", stackedGoods, _("##qty_stacked_in_city_warehouse##") );
+    std::string text = utils::format( 0xff, "%d %s", stackedGoods, _("##qty_stacked_in_city_warehouse##") );
     lbStackedQty->setText( text );
   }
 
-  _d->btnTradeState = new TradeStateButton( this, Rect( 50, 85, width() - 60, 85 + 30), -1 );
+  _d->btnTradeState = new TradeStateButton( this, Rect( 50, 90, width() - 60, 90 + 30), -1 );
+  if( gmode == gmUnknown )
+  {
+    _d->btnTradeState->setTradeState( trade::noTrade, 0 );
+    _d->btnTradeState->setEnabled( false );
+  }
 
   updateTradeState();
   updateIndustryState();
@@ -172,33 +183,35 @@ void GoodOrderManageWindow::draw(Engine &painter)
   painter.draw( _d->icon, absoluteRect().lefttop() + Point( 10, 10 ) );
 }
 
-void GoodOrderManageWindow::increaseQty()
-{
-  city::TradeOptions& ctrade = _d->city->tradeOptions();
-  ctrade.setExportLimit( _d->type, math::clamp<int>( ctrade.exportLimit( _d->type )+1, 0, 999 ) );
-  updateTradeState();
-}
+void GoodOrderManageWindow::increaseQty() { _changeTradeLimit( +1 ); }
 
-void GoodOrderManageWindow::decreaseQty()
-{
-  city::TradeOptions& ctrade = _d->city->tradeOptions();
-  ctrade.setExportLimit( _d->type, math::clamp<int>( ctrade.exportLimit( _d->type )-1, 0, 999 ) );
-  updateTradeState();
-}
+void GoodOrderManageWindow::decreaseQty() { _changeTradeLimit( -1 ); }
 
 void GoodOrderManageWindow::updateTradeState()
 {
-  city::TradeOptions& ctrade = _d->city->tradeOptions();
-  city::TradeOptions::Order order = ctrade.getOrder( _d->type );
-  int qty = ctrade.exportLimit( _d->type );
+  trade::Options& ctrade = _d->city->tradeOptions();
+  trade::Order order = ctrade.getOrder( _d->type );
+  int qty = ctrade.tradeLimit( order, _d->type );
   _d->btnTradeState->setTradeState( order, qty );
 }
 
 void GoodOrderManageWindow::changeTradeState()
 {
-  _d->city->tradeOptions().switchOrder( _d->type );
+  trade::Options& trOpts = _d->city->tradeOptions();
+  if( _d->gmode == gmImport )
+  {
+    trade::Order order = trOpts.getOrder( _d->type );
+    trOpts.setOrder( _d->type, order == trade::importing
+                                  ? trade::noTrade
+                                  : trade::importing );
+  }
+  else
+  {
+    trOpts.switchOrder( _d->type );
+  }
+
   updateTradeState();
-  oc3_emit _d->onOrderChangedSignal();
+  emit _d->onOrderChangedSignal();
 }
 
 bool GoodOrderManageWindow::isIndustryEnabled()
@@ -208,34 +221,37 @@ bool GoodOrderManageWindow::isIndustryEnabled()
   bool anyFactoryWork = false;
   FactoryList factories = helper.getProducers<Factory>( _d->type );
   foreach( factory, factories )
-    {
-      anyFactoryWork |= (*factory)->isActive();
-    }
+  {
+    anyFactoryWork |= (*factory)->isActive();
+  }
 
   return factories.empty() ? true : anyFactoryWork;
 }
 
 void GoodOrderManageWindow::updateIndustryState()
 {
-  bool industryActive = _d->city->tradeOptions().isVendor( _d->type );
-  _d->btnIndustryState->setVisible( industryActive );
-
-  if( !industryActive )
-    {
-      return;
-    }
-
   city::Helper helper( _d->city );
   int workFactoryCount=0, idleFactoryCount=0;
-
   FactoryList factories = helper.getProducers<Factory>( _d->type );
   foreach( factory, factories )
   {
     ( (*factory)->standIdle() ? idleFactoryCount : workFactoryCount ) += 1;
   }
 
-  std::string text = StringHelper::format( 0xff, "%d %s, %d %s", workFactoryCount, _("##work##"),
-                                           idleFactoryCount, _("##idle_factory_in_city##") );
+  //bool industryActive = _d->city->tradeOptions().isVendor( _d->type );
+  if( factories.empty() )
+  {
+    _d->btnIndustryState->setEnabled( false );
+    _d->btnIndustryState->setBackgroundStyle( PushButton::noBackground );
+    _d->btnIndustryState->setText( _("##no_industries_in_city##" ) );
+    return;
+  }  
+
+  std::string postfixWork = (workFactoryCount%10 == 1) ? "##working_industry##" : "##working_industries##";
+  std::string postfixIdle = (workFactoryCount%10 == 1) ? "##idle_factory_in_city##" : "##idle_factories_in_city##";
+
+  std::string text = utils::format( 0xff, "%d %s\n%d %s", workFactoryCount, _(postfixWork),
+                                           idleFactoryCount, _(postfixIdle) );
   _d->lbIndustryInfo->setText( text );
 
   bool industryEnabled = isIndustryEnabled();
@@ -252,7 +268,7 @@ void GoodOrderManageWindow::toggleIndustryEnable()
   foreach( factory, factories ) { (*factory)->setActive( !industryEnabled ); }
 
   updateIndustryState();
-  oc3_emit _d->onOrderChangedSignal();
+  emit _d->onOrderChangedSignal();
 }
 
 void GoodOrderManageWindow::toggleStackingGoods()
@@ -261,7 +277,7 @@ void GoodOrderManageWindow::toggleStackingGoods()
   _d->city->tradeOptions().setStackMode( _d->type, !isStacking );
 
   updateStackingState();
-  oc3_emit _d->onOrderChangedSignal();
+  emit _d->onOrderChangedSignal();
 }
 
 void GoodOrderManageWindow::updateStackingState()
@@ -270,17 +286,32 @@ void GoodOrderManageWindow::updateStackingState()
   std::string text;
   if( isStacking )
   {
-    text = StringHelper::format( 0xff, "%s %s", _("##stacking_resource##"), _("##click_here_that_use_it##") );
+    text = utils::format( 0xff, "%s %s", _("##stacking_resource##"), _("##click_here_that_use_it##") );
   }
   else
   {
-    text = StringHelper::format( 0xff, "%s %s", _("##use_and_trade_resource##"), _("##click_here_that_stacking##") );
+    text = utils::format( 0xff, "%s %s", _("##use_and_trade_resource##"), _("##click_here_that_stacking##") );
   }
 
   _d->btnStackingState->setText( text );
 }
 
 Signal0<> &GoodOrderManageWindow::onOrderChanged() { return _d->onOrderChangedSignal; }
+
+void GoodOrderManageWindow::_changeTradeLimit(int value)
+{
+  trade::Options& ctrade = _d->city->tradeOptions();
+
+  trade::Order state = _d->btnTradeState->order;
+  if( state == trade::importing ||
+      state == trade::exporting )
+  {
+    unsigned int limit = ctrade.tradeLimit( state, _d->type );
+    limit = math::clamp<int>( limit+value, 0, 999 );
+    ctrade.setTradeLimit( state, _d->type, limit );
+  }
+  updateTradeState();
+}
 
 }
 

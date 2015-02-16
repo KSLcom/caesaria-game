@@ -17,6 +17,7 @@
 #include "core/gettext.hpp"
 #include "city/city.hpp"
 #include "game/resourcegroup.hpp"
+#include "gfx/helper.hpp"
 #include "gfx/tilemap.hpp"
 #include "core/foreach.hpp"
 
@@ -40,8 +41,10 @@ void ThrowingWeapon::toThrow(TilePos src, TilePos dst)
 {
   _d->from = src;
   _d->dst = dst;
-  _d->dstPos = Point( dst.i(), dst.j() ) * 15 + Point( 7, 7 );
-  _d->srcPos = Point( src.i(), src.j() ) * 15 + Point( 7, 7 );
+  int yMultiplier = tilemap::cellSize().height();
+  Point xOffset( yMultiplier, yMultiplier );
+  _d->dstPos = Point( dst.i(), dst.j() ) * yMultiplier + xOffset;
+  _d->srcPos = Point( src.i(), src.j() ) * yMultiplier + xOffset;
 
   _d->deltaMove = ( _d->dstPos - _d->srcPos ).toPointF() / (dst.distanceFrom( src) * 2.f);
   _d->currentPos = _d->srcPos.toPointF();
@@ -53,12 +56,12 @@ void ThrowingWeapon::toThrow(TilePos src, TilePos dst)
   TileOverlayPtr ov = tile.overlay();
   if( ov.isValid() )
   {
-    _d->height = ov->offset( tile, Point( 7, 7 ) ).y();
+    _d->height = ov->offset( tile, xOffset ).y();
     const Tile& dTile = _city()->tilemap().at( dst );
     ov = dTile.overlay();
     if( ov.isValid() )
     {
-      float dHeight = ov->offset( dTile, Point( 7, 7) ).y();
+      float dHeight = ov->offset( dTile, xOffset ).y();
       _d->deltaHeight = (dHeight - _d->height) / 20.f;
     }
   }
@@ -81,7 +84,10 @@ void ThrowingWeapon::timeStep(const unsigned long time)
     PointF saveCurrent = _d->currentPos;
     _d->currentPos += _d->deltaMove;
     _d->height += _d->deltaHeight;
-    TilePos ij( (_d->currentPos.x() - 7) / 15, (_d->currentPos.y() - 7) / 15 );
+    const int wcell = tilemap::cellSize().height();
+
+    Point tp = (_d->currentPos.toPoint() - tilemap::cellCenter()) / wcell;
+    TilePos ij( tp.x(), tp.y() );
     setPos( ij );
     _setWpos( _d->currentPos.toPoint() );
 
@@ -101,7 +107,9 @@ void ThrowingWeapon::timeStep(const unsigned long time)
 
 void ThrowingWeapon::turn(TilePos p)
 {
-  PointF prPos = PointF( p.i(), p.j() ) * 15 + PointF( 7, 7 );
+  int yMultiplier = tilemap::cellSize().height();
+  PointF xOffset( yMultiplier, yMultiplier );
+  PointF prPos = PointF( p.i(), p.j() ) * yMultiplier + xOffset;
   float t = (_d->currentPos - prPos).getAngle();
   int angle = (int)( t / 22.5f);// 0 is east
 

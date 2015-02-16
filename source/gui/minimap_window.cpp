@@ -28,6 +28,7 @@
 #include "objects/constants.hpp"
 #include "gfx/camera.hpp"
 #include "walker/walker.hpp"
+#include "core/tilerect.hpp"
 
 using namespace gfx;
 using namespace constants;
@@ -43,7 +44,7 @@ public:
   PlayerCityPtr city;
   Camera const* camera;
 
-  MinimapColors* colors;
+  minimap::Colors* colors;
 
   int lastTimeUpdate;
   Point center;
@@ -52,7 +53,7 @@ public:
   void getBuildingColours(const Tile& tile, int &c1, int &c2);
   void updateImage();
 
-public oc3_signals:
+public signals:
   Signal1<TilePos> onCenterChangeSignal;
 };
 
@@ -63,7 +64,7 @@ Minimap::Minimap(Widget* parent, Rect rect, PlayerCityPtr city, const gfx::Camer
   _d->camera = &camera;
   _d->lastTimeUpdate = 0;
   _d->minimap.reset( Picture::create( Size( 144, 110 ), 0, true ) );
-  _d->colors = new MinimapColors( (ClimateType)city->climate() );
+  _d->colors = new minimap::Colors( (ClimateType)city->climate() );
   setTooltipText( _("##minimap_tooltip##") );
 }
 
@@ -76,7 +77,7 @@ void Minimap::Impl::getTerrainColours(const Tile& tile, int &c1, int &c2)
   int num3 = rndData & 0x3;
   int num7 = rndData & 0x7;
 
-  TileOverlay::Type ovType = construction::unknown;
+  TileOverlay::Type ovType = objects::unknown;
   if( tile.overlay().isValid() )
     ovType = tile.overlay()->type();
 
@@ -88,52 +89,52 @@ void Minimap::Impl::getTerrainColours(const Tile& tile, int &c1, int &c2)
 
   if (tile.getFlag( Tile::tlTree ))
   {
-    c1 = colors->colour(MinimapColors::MAP_TREE1, num3);
-    c2 = colors->colour(MinimapColors::MAP_TREE2, num7);
+    c1 = colors->colour(minimap::Colors::MAP_TREE1, num3);
+    c2 = colors->colour(minimap::Colors::MAP_TREE2, num7);
   }
   else if (tile.getFlag( Tile::tlRock ))
   {
-    c1 = colors->colour(MinimapColors::MAP_ROCK1, num3);
-    c2 = colors->colour(MinimapColors::MAP_ROCK2, num3);
+    c1 = colors->colour(minimap::Colors::MAP_ROCK1, num3);
+    c2 = colors->colour(minimap::Colors::MAP_ROCK2, num3);
   }
   else if(tile.getFlag( Tile::tlDeepWater) )
   {
-    c1 = colors->colour(MinimapColors::MAP_WATER1, num3);
-    c2 = colors->colour(MinimapColors::MAP_WATER2, num3);
+    c1 = colors->colour(minimap::Colors::MAP_WATER1, num3);
+    c2 = colors->colour(minimap::Colors::MAP_WATER2, num3);
   }
   else if(tile.getFlag( Tile::tlWater ))
   {
-    c1 = colors->colour(MinimapColors::MAP_WATER1, num3);
-    c2 = colors->colour(MinimapColors::MAP_WATER2, num7);
+    c1 = colors->colour(minimap::Colors::MAP_WATER1, num3);
+    c2 = colors->colour(minimap::Colors::MAP_WATER2, num7);
   }
   else if (tile.getFlag( Tile::tlRoad ))
   {
-    c1 = colors->colour(MinimapColors::MAP_ROAD, 0);
-    c2 = colors->colour(MinimapColors::MAP_ROAD, 1);
+    c1 = colors->colour(minimap::Colors::MAP_ROAD, 0);
+    c2 = colors->colour(minimap::Colors::MAP_ROAD, 1);
   }
   else if (tile.getFlag( Tile::tlMeadow ))
   {
-    c1 = colors->colour(MinimapColors::MAP_FERTILE1, num3);
-    c2 = colors->colour(MinimapColors::MAP_FERTILE2, num7);
+    c1 = colors->colour(minimap::Colors::MAP_FERTILE1, num3);
+    c2 = colors->colour(minimap::Colors::MAP_FERTILE2, num7);
   }
   else if (tile.getFlag( Tile::tlWall ))
   {
-    c1 = colors->colour(MinimapColors::MAP_WALL, 0);
-    c2 = colors->colour(MinimapColors::MAP_WALL, 1);
+    c1 = colors->colour(minimap::Colors::MAP_WALL, 0);
+    c2 = colors->colour(minimap::Colors::MAP_WALL, 1);
   }
-  else if( ovType == building::aqueduct  )
+  else if( ovType == objects::aqueduct  )
   {
-    c1 = colors->colour(MinimapColors::MAP_AQUA, 0);
-    c2 = colors->colour(MinimapColors::MAP_AQUA, 1);
+    c1 = colors->colour(minimap::Colors::MAP_AQUA, 0);
+    c2 = colors->colour(minimap::Colors::MAP_AQUA, 1);
   }
-  else if (tile.getFlag( Tile::tlBuilding ))
+  else if (tile.getFlag( Tile::tlOverlay ))
   {
     getBuildingColours(tile, c1, c2);
   }
   else // plain terrain
   {
-    c1 = colors->colour(MinimapColors::MAP_EMPTY1, num3);
-    c2 = colors->colour(MinimapColors::MAP_EMPTY2, num7);
+    c1 = colors->colour(minimap::Colors::MAP_EMPTY1, num3);
+    c2 = colors->colour(minimap::Colors::MAP_EMPTY2, num7);
   }
 
   c1 |= 0xff000000;
@@ -156,44 +157,57 @@ void Minimap::Impl::getBuildingColours(const Tile& tile, int &c1, int &c2)
 
   switch(type)
   {
-    case building::house:
+    case objects::house:
     {
       switch (overlay->size().width())
       {
         case 1:
           {
-            c1 = colors->colour(MinimapColors::MAP_HOUSE, 0);
-            c2 = colors->colour(MinimapColors::MAP_HOUSE, 1);
-            break;
+            c1 = colors->colour(minimap::Colors::MAP_HOUSE, 0);
+            c2 = colors->colour(minimap::Colors::MAP_HOUSE, 1);
           }
+        break;
+
         default:
           {
-            c1 = colors->colour(MinimapColors::MAP_HOUSE, 2);
-            c2 = colors->colour(MinimapColors::MAP_HOUSE, 0);
+            c1 = colors->colour(minimap::Colors::MAP_HOUSE, 2);
+            c2 = colors->colour(minimap::Colors::MAP_HOUSE, 0);
           }
         }
         break;
-        }
-      case building::reservoir:
-        {
-          c1 = colors->colour(MinimapColors::MAP_AQUA, 1);
-          c2 = colors->colour(MinimapColors::MAP_AQUA, 0);
-          break;
-        }
+      }
+      break;
+
+      case objects::reservoir:
+      {
+        c1 = colors->colour(minimap::Colors::MAP_AQUA, 1);
+        c2 = colors->colour(minimap::Colors::MAP_AQUA, 0);
+      }
+      break;
+
+      case objects::fort_javelin:
+      case objects::fort_legionaries:
+      case objects::fort_horse:
+      {
+        c1 = colors->colour(minimap::Colors::MAP_SPRITES, 1);
+        c2 = colors->colour(minimap::Colors::MAP_SPRITES, 1);
+      }
+      break;
+
       default:
         {
           switch (overlay->size().width())
           {
           case 1:
           {
-            c1 = colors->colour(MinimapColors::MAP_BUILDING, 0);
-            c2 = colors->colour(MinimapColors::MAP_BUILDING, 1);
+            c1 = colors->colour(minimap::Colors::MAP_BUILDING, 0);
+            c2 = colors->colour(minimap::Colors::MAP_BUILDING, 1);
             break;
           }
           default:
           {
-            c1 = colors->colour(MinimapColors::MAP_BUILDING, 0);
-            c2 = colors->colour(MinimapColors::MAP_BUILDING, 2);
+            c1 = colors->colour(minimap::Colors::MAP_BUILDING, 0);
+            c2 = colors->colour(minimap::Colors::MAP_BUILDING, 2);
           }
         }
     }
@@ -248,16 +262,34 @@ void Minimap::Impl::updateImage()
     }
 
 
-    WalkerList walkers = city->walkers( walker::any, startPos, stopPos );
-    foreach( it, walkers )
+    const WalkerList& walkers = city->walkers();
+    TileRect trect( startPos, stopPos );
+    //TilePos leftBottomPos = TilePos(std::min(startPos.i(), stopPos.i()), std::min(startPos.j(), stopPos.j()));
+    //TilePos rightTopPos = TilePos(std::max(startPos.i(), stopPos.i()), std::max(startPos.j(), stopPos.j()));
+    foreach( w, walkers)
     {
-      WalkerPtr wlk = *it;
-      if( wlk->agressive() != 0 )
+      TilePos pos = (*w)->pos();
+      if( trect.contain( pos ) )
       {
-        NColor c1 = wlk->agressive() > 0 ? DefaultColors::red : DefaultColors::blue;
+        NColor cl;
+        if ((*w)->agressive() != 0)
+        {
 
-        Point pnt = getBitmapCoordinates( wlk->pos().i()-startPos.i() - 40, wlk->pos().j()-startPos.j()-60, mapsize);
-        minimap->fill( c1, Rect( pnt, Size(2) ) );
+          if ((*w)->agressive() > 0)
+          {
+            cl = DefaultColors::red;
+          }
+          else
+          {
+            cl = DefaultColors::blue;
+          }
+
+          if (cl.color != 0)
+          {
+            Point pnt = getBitmapCoordinates(pos.i() - startPos.i() - 40, pos.j() - startPos.j() - 60, mapsize);
+            minimap->fill(cl, Rect(pnt, Size(2)));
+          }
+        }        
       }
     }
   }
@@ -332,7 +364,7 @@ bool Minimap::onEvent(const NEvent& event)
     tpos.setI( (clickPosition.x() + clickPosition.y() - mapsize + 1) / 2 );
     tpos.setJ( -clickPosition.y() + tpos.i() + mapsize - 1 );
 
-    oc3_emit _d->onCenterChangeSignal( tpos );
+    emit _d->onCenterChangeSignal( tpos );
   }
 
   return Widget::onEvent( event );

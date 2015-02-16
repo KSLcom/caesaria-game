@@ -40,8 +40,7 @@ class BaseServiceCreator : public ServiceCreator
 public:
   virtual SrvcPtr create( PlayerCityPtr city )
   {
-    SrvcPtr ret( T::create( city ) );
-    return ret;
+    return T::create( city );
   }
 
   virtual std::string serviceName() const { return T::defaultName(); }
@@ -51,7 +50,7 @@ public:
 class ServiceFactory
 {
 public:
-  static SrvcPtr create( const std::string& name, PlayerCityPtr city);
+  static SrvcPtr create( PlayerCityPtr city, const std::string& name);
   static ServiceFactory& instance();
   void addCreator( ServiceCreatorPtr creator );
 

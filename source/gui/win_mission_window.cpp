@@ -21,52 +21,75 @@
 #include "core/logger.hpp"
 #include "core/gettext.hpp"
 #include "widget_helper.hpp"
+#include "core/event.hpp"
 #include "widget_deleter.hpp"
+#include "dialogbox.hpp"
+#include "environment.hpp"
 
 namespace gui
 {
 
-class WinMissionWindow::Impl
+namespace dialog
+{
+
+class WinMission::Impl
 {
 public:
   GameAutoPause locker;
 
-public oc3_signals:
-  Signal0<> onNextMissionSignal;
-  Signal1<int> onContinueRulesSignal;
+public signals:
+  Signal0<> nextMissionSignal;
+  Signal1<int> continueRulesSignal;
 };
 
-WinMissionWindow::WinMissionWindow(Widget* p, const std::string& newTitle, const std::string& winText, bool mayContinue )
+WinMission::WinMission(Widget* p, const std::string& newTitle, const std::string& winText, bool mayContinue )
   : Window( p, Rect( 0, 0, 540, 240 ), "" ), _d( new Impl )
 {
   setupUI( ":/gui/winmission.gui" );
 
-  Logger::warning( "WinMissionWindow: show" );
+  Logger::warning( "dialog::WinMission show" );
   _d->locker.activate();
 
   setCenter( p->center() );
 
   Label* lbNewTitle;
+  PushButton* btnContinue2years;
+  PushButton* btnContinue5years;
+
   GET_WIDGET_FROM_UI( lbNewTitle )
+  GET_WIDGET_FROM_UI( btnContinue2years )
+  GET_WIDGET_FROM_UI( btnContinue5years )
+
   if( lbNewTitle ) lbNewTitle->setText( _( newTitle ) );
-
-  PushButton* btnAccept;
-  GET_WIDGET_FROM_UI( btnAccept )
-
-  CONNECT( btnAccept, onClicked(), &_d->onNextMissionSignal, Signal0<>::emit );
-  CONNECT( btnAccept, onClicked(), this, WinMissionWindow::deleteLater );
 
   if( !winText.empty() )
   {
-    Label* lbWin = new Label( this, Rect( 30, 30, width()-30, height()-30 ), _(winText), false, Label::bgWhiteFrame );
-    lbWin->setTextAlignment( align::center, align::center );
-    lbWin->setWordwrap( true );
-    WidgetDeleter::assignTo( lbWin, 3000 );
+    DialogBox::information( ui()->rootWidget(), "",  _(winText) );
   }
+
+  if( btnContinue2years ) btnContinue2years->setVisible( mayContinue );
+  if( btnContinue5years ) btnContinue5years->setVisible( mayContinue );
 }
 
-WinMissionWindow::~WinMissionWindow(){}
-Signal0<>& WinMissionWindow::onAcceptAssign(){  return _d->onNextMissionSignal; }
-Signal1<int>& WinMissionWindow::onContinueRules(){  return _d->onContinueRulesSignal; }
+WinMission::~WinMission(){}
+
+bool WinMission::onEvent(const NEvent &event)
+{
+  if( event.EventType == sEventGui && event.gui.type == guiButtonClicked )
+  {
+    switch( event.gui.caller->ID() )
+    {
+    case 0xff: emit _d->nextMissionSignal(); deleteLater(); break;
+    default: emit _d->continueRulesSignal( event.gui.caller->ID()); deleteLater(); break;
+    }
+  }
+
+  return Window::onEvent( event );
+}
+
+Signal0<>& WinMission::onAcceptAssign(){  return _d->nextMissionSignal; }
+Signal1<int>& WinMission::onContinueRules(){  return _d->continueRulesSignal; }
+
+}//end namespace dialog
 
 }//end namespace gui

@@ -20,34 +20,36 @@
 
 #include "core/referencecounted.hpp"
 #include "gfx/layer.hpp"
-#include "city_renderer.hpp"
-#include "core/font.hpp"
 
 namespace gfx
 {
 
-class LayerDestroy : public Layer
+namespace layer
+{
+
+class Destroy : public Layer
 {
 public:
   virtual void handleEvent( NEvent& event );
   virtual int type() const;
   virtual void drawTile( Engine& engine, Tile& tile, const Point& offset );
   virtual void render( Engine& engine);
+  virtual void renderUi(Engine &engine);
+  virtual void init( Point cursor );
 
   static LayerPtr create( Camera& camera, PlayerCityPtr city );
 
 private:
-  LayerDestroy( Camera& camera, PlayerCityPtr city );
+  Destroy( Camera& camera, PlayerCityPtr city );
 
-  void _drawTileInSelArea( Engine& engine, Tile& tile, Tile* master, const Point& offset);
   void _clearAll();
   unsigned int _checkMoney4destroy( const Tile& tile );
 
-  Picture _clearPic;
-  PictureRef _textPic;
-  unsigned int _money4destroy;
-  Font _textFont;
+  class Impl;
+  ScopedPtr<Impl> _d;
 };
+
+}
 
 }//end namespace gfx
 #endif //__CAESARIA_LAYERDESTROY_H_INCLUDED__

@@ -18,12 +18,15 @@
 #ifndef __CAESARIA_LAYERINDIGENE_H_INCLUDED__
 #define __CAESARIA_LAYERINDIGENE_H_INCLUDED__
 
-#include "layer.hpp"
+#include "layerinfo.hpp"
 
 namespace gfx
 {
 
-class LayerIndigene : public Layer
+namespace layer
+{
+
+class Indigene : public Info
 {
 public:
   virtual int type() const;
@@ -33,8 +36,10 @@ public:
   static LayerPtr create( Camera& camera, PlayerCityPtr city );
 
 private:
-  LayerIndigene( Camera& camera, PlayerCityPtr city );
+  Indigene( Camera& camera, PlayerCityPtr city );
 };
+
+}//end namespace layer
 
 }//end namespace gfx
 #endif //__CAESARIA_LAYERINDIGENE_H_INCLUDED__

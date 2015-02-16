@@ -27,10 +27,10 @@ namespace infobox
 class AboutWarehouse : public AboutConstruction
 {
 public:
-  AboutWarehouse( Widget* parent, const gfx::Tile& tile );
+  AboutWarehouse( Widget* parent, PlayerCityPtr city, const gfx::Tile& tile );
   virtual ~AboutWarehouse();
 
-  void drawGood( const Good::Type &goodType, int col, int paintY);
+  void drawGood( const good::Product& goodType, int col, int paintY);
   void showSpecialOrdersWindow();
 
 private:

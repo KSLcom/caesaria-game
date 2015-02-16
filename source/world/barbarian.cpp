@@ -23,7 +23,9 @@
 #include "merchant.hpp"
 #include "gfx/animation.hpp"
 #include "city.hpp"
+#include "core/variant_map.hpp"
 #include "game/gamedate.hpp"
+#include "events/notification.hpp"
 
 namespace world
 {
@@ -77,6 +79,11 @@ void Barbarian::updateStrength(int value)
 
 int Barbarian::viewDistance() const { return 60; }
 
+bool Barbarian::_isAgressiveArmy(ArmyPtr other) const
+{
+  return !is_kind_of<Barbarian>( other );
+}
+
 void Barbarian::_check4attack()
 {
   MovableObjectList mobjects;
@@ -114,7 +121,7 @@ void Barbarian::_check4attack()
      CityList cities = empire()->cities();
      std::map< int, CityPtr > citymap;
 
-     DateTime currentDate = GameDate::current();
+     DateTime currentDate = game::Date::current();
      foreach( it, cities )
      {
        float distance = location().distanceTo( (*it)->location() );
@@ -128,6 +135,10 @@ void Barbarian::_check4attack()
        if( validWay )
        {
          _d->mode = Impl::go2object;
+
+         events::GameEventPtr e = events::Notification::attack( it->second->name(), "##barbaria_attack_empire_city##", this );
+         e->dispatch();
+
          break;
        }
      }
@@ -195,6 +206,7 @@ bool Barbarian::_attackObject(ObjectPtr obj)
 
     return !pcity->strength();
   }
+  //else if( )
 
   return false;
 }
@@ -207,7 +219,7 @@ Barbarian::Barbarian( EmpirePtr empire )
 
   _animation().clear();
   _animation().load( ResourceGroup::empirebits, 53, 16 );
-  Size size = _animation().getFrame( 0 ).size();
+  Size size = _animation().frame( 0 ).size();
   _animation().setOffset( Point( -size.width() / 2, size.height() / 2 ) );
   _animation().setLoop( gfx::Animation::loopAnimation );
 }

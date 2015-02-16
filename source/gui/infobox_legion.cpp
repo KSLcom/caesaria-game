@@ -21,7 +21,6 @@
 #include "infobox_legion.hpp"
 #include "environment.hpp"
 #include "core/foreach.hpp"
-#include "game/settings.hpp"
 #include "label.hpp"
 #include "core/gettext.hpp"
 #include "pushbutton.hpp"
@@ -31,7 +30,7 @@
 #include "core/event.hpp"
 #include "objects/fort.hpp"
 #include "core/logger.hpp"
-#include "core/stringhelper.hpp"
+#include "core/utils.hpp"
 #include "widget_helper.hpp"
 
 using namespace constants;
@@ -52,14 +51,21 @@ public:
   Label* lbMoraleValue;
   Label* lbTrainedValue;
   Label* gbLegionParams;
+  Label* gbLegionParams2;
+
+  Label* lbIcon;
+  Label* lbFlag;
+  Label* lbMoraleStandart;
+
   PushButton* btnReturn;
+  PushButton* btnAttackAnimals;
   FortPtr fort;
 };
 
 AboutLegion::AboutLegion(Widget* parent, PlayerCityPtr city, const TilePos& pos  )
   : Simple( parent, Rect( 0, 0, 460, 350 ), Rect() ), _d( new Impl )
 {  
-  Widget::setupUI( GameSettings::rcpath( "/gui/legionopts.gui") );
+  Widget::setupUI( ":/gui/legionopts.gui" );
 
   GET_DWIDGET_FROM_UI( _d, lbFormationTitle )
   GET_DWIDGET_FROM_UI( _d, lbFormation )
@@ -69,23 +75,15 @@ AboutLegion::AboutLegion(Widget* parent, PlayerCityPtr city, const TilePos& pos 
   GET_DWIDGET_FROM_UI( _d, lbMoraleValue )
   GET_DWIDGET_FROM_UI( _d, lbTrainedValue )
   GET_DWIDGET_FROM_UI( _d, gbLegionParams )
+  GET_DWIDGET_FROM_UI( _d, gbLegionParams2 )
+  GET_DWIDGET_FROM_UI( _d, btnAttackAnimals )
+  GET_DWIDGET_FROM_UI( _d, lbIcon )
+  GET_DWIDGET_FROM_UI( _d, lbFlag )
+  GET_DWIDGET_FROM_UI( _d, lbMoraleStandart )
 
-  WalkerList walkers = city->walkers( walker::any, pos );
+  WalkerList walkers = city->walkers( pos );
 
-  if( walkers.empty() )
-  {
-    _d->gbLegionParams->hide();
-
-    city::Helper helper( city );
-    BuildingList barracks = helper.find<Building>( building::barracks );
-
-    std::string text = barracks.empty()
-                        ? "##legion_haveho_soldiers_and_barracks##"
-                        : "##legion_haveho_soldiers##";
-
-    setText( _( text ) );
-  }
-  else
+  if( !walkers.empty() )
   {
     foreach( i, walkers )
     {
@@ -102,17 +100,44 @@ AboutLegion::AboutLegion(Widget* parent, PlayerCityPtr city, const TilePos& pos 
         _d->fort = pp->base();
         break;
       }
-    }
+    }       
   }
 
-  setTitle( _( _d->fort.isValid()
-                ? _d->fort->legionName()
-                : "##unknown_legion##" ) );
+  std::string fortTitle = "##unknown_legion##";
+  if( _d->fort.isValid() )
+  {
+    SoldierList soldiers = _d->fort->soldiers();
 
-  _addAvailalbesFormation();
+    if( soldiers.empty() )
+    {
+      _d->gbLegionParams->hide();
+      _d->btnAttackAnimals->hide();
+      //_d->gbLegionParams2->hide();
+      _d->btnReturn->hide();
+
+      city::Helper helper( city );
+      BuildingList barracks = helper.find<Building>( objects::barracks );
+
+      std::string text = barracks.empty()
+                          ? "##legion_haveho_soldiers_and_barracks##"
+                          : "##legion_haveho_soldiers##";
+
+      _lbTextRef()->move( Point( 0, 20 ));
+      setText( _( text ) );
+    }
+    else
+    {
+      _addAvailalbesFormation();
+    }
+
+    fortTitle = _d->fort->legionName();
+  }
+
+  setTitle( _( fortTitle ) );
   _update();
 
   CONNECT( _d->btnReturn, onClicked(), this, AboutLegion::_returnSoldiers2fort );
+  CONNECT( _d->btnAttackAnimals, onClicked(), this, AboutLegion::_toggleAnimalsAttack );
 }
 
 AboutLegion::~AboutLegion() {}
@@ -124,7 +149,7 @@ void AboutLegion::_update()
 
   if( _d->lbNumberValue )
   {
-    _d->lbNumberValue->setText( StringHelper::i2str( _d->fort->soldiers().size() ) );
+    _d->lbNumberValue->setText( utils::i2str( _d->fort->soldiers().size() ) );
   }
 
   if( _d->lbHealthValue )
@@ -137,16 +162,49 @@ void AboutLegion::_update()
   if( _d->lbMoraleValue )
   {
     const char* morale[] = { "##sldr_totally_distraught##", "##sldr_terrified##", "##sldr_very_frightened##",
-                            "##sldr_badly_shaken##", "##sldr_shaken##",
-                            "##sldr_extremely_scared##",
-                            "##sldr_daring##", "##sldr_encouraged##", "##sdlr_bold##" ,"##sldr_very_bold##" };
-    int index = math::clamp<unsigned int>( _d->fort->legionMorale() / 10, 0, 9 );
+                             "##sldr_badly_shaken##", "##sldr_shaken##",
+                             "##sldr_extremely_scared##",
+                             "##sldr_daring##", "##sld_quite_daring##", "##sldr_encouraged##", "##sdlr_bold##" ,"##sldr_very_bold##" };
+    int index = math::clamp<unsigned int>( _d->fort->legionMorale() / 9, 0, 9 );
     _d->lbMoraleValue->setText( _( morale[ index ] ) );
   }
 
   if( _d->lbTrainedValue )
   {
-    _d->lbTrainedValue->setText( StringHelper::i2str( _d->fort->legionTrained() ) );
+    _d->lbTrainedValue->setText( utils::i2str( _d->fort->legionTrained() ) );
+  }
+
+  if( _d->btnAttackAnimals )
+  {
+    std::string text = utils::format( 0xff, "##attack_animals_%s##", _d->fort->isAttackAnimals() ? "on" : "off" );
+    _d->btnAttackAnimals->setText( text );
+  }
+
+  if( _d->lbIcon ) { _d->lbIcon->setIcon( _d->fort->legionEmblem() ); }
+
+  if( _d->lbFlag )
+  {
+    int flIndex = 0;
+    switch( _d->fort->type() )
+    {
+    case objects::fort_javelin: flIndex = 30; break;
+    case objects::fort_legionaries: flIndex = 21; break;
+    case objects::fort_horse: flIndex = 39; break;
+
+    default: break;
+    }
+
+    gfx::Picture pic = gfx::Picture::load( ResourceGroup::sprites, flIndex );
+    pic.setOffset( 0, 0 );
+    _d->lbFlag->setIcon( pic );
+  }
+
+  if( _d->lbMoraleStandart )
+  {
+    int mIndex = 20 - math::clamp<int>( _d->fort->legionMorale() / 5, 0, 20 );
+    gfx::Picture pic = gfx::Picture::load( ResourceGroup::sprites, mIndex+ 48 );
+    pic.setOffset( 0, 0 );
+    _d->lbMoraleStandart->setIcon( pic );
   }
 }
 
@@ -166,6 +224,15 @@ void AboutLegion::_addAvailalbesFormation()
   }
 }
 
+void AboutLegion::_toggleAnimalsAttack()
+{
+  if( _d->fort.isValid() )
+  {
+    _d->fort->setAttackAnimals( !_d->fort->isAttackAnimals() );
+    _update();
+  }
+}
+
 bool AboutLegion::onEvent(const NEvent& event)
 {
   if( event.EventType == sEventGui && event.gui.type == guiButtonClicked )
@@ -176,11 +243,11 @@ bool AboutLegion::onEvent(const NEvent& event)
       std::string text;
       switch( id )
       {
-      case Fort::frmNorthLine: text = "##defensive_formation"; break;
-      case Fort::frmWestLine: text = "##defensive_formation2_"; break;
-      case Fort::frmNorthDblLine: text = "##simple_formation"; break;
-      case Fort::frmWestDblLine: text = "##simple_formation2"; break;
-      case Fort::frmRandomLocation: text = "##simple_random_location"; break;
+      case Fort::frmNorthLine: text = "##line_formation"; break;
+      case Fort::frmWestLine: text = "##line_formation"; break;
+      case Fort::frmNorthDblLine: text = "##mopup_formation"; break;
+      case Fort::frmWestDblLine: text = "##mopup_formation"; break;
+      case Fort::frmOpen: text = "##open_formation"; break;
 
       default:
       break;

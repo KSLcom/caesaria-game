@@ -106,6 +106,8 @@ public:
 
   virtual void setAlpha( unsigned int value );
 
+  virtual void setColor( NColor color );
+
   virtual void setTextAlignment( Alignment horizontal, Alignment vertical );
 
   virtual void setLineIntervalOffset( const int offset );
@@ -114,7 +116,7 @@ public:
 
   virtual void setTextOffset( Point offset );
     
-oc3_signals public:
+signals public:
   virtual Signal0<>& onClicked();
 
 protected:

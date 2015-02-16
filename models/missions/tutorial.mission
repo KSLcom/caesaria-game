@@ -5,9 +5,9 @@
   city.name : "Brundisium"
   player.rank : 0
   date : "-350.01.01"
-  finish : "-300.01.01"
   adviserEnabled : false
   fishPlaceEnabled : false
+  climate : 0
 	
   win :
   {
@@ -19,16 +19,21 @@
     next : ":/missions/tutorial2.mission"
     title : "##clerk##"
     may_continue : false
-    win.text : "##tutorial_win_text##"
     short : "##build_some_houses##"
+    finishDate : "-300.01.01"
     maxHouseLevel : "big_villa"
     caption : "##new_village##"
     overview :  [ "##tutorial_text##",
-                  "@img=picture2_00002" ]
+                  "@img=picture2_00002",
+                  "##tutorial_text_roads##",
+                  "@img=picture3_00002",
+                  "##tutorial_text_roads2##",
+                  "@img=picture3_00003" ]
   }
 	
   empire : {
     enabled : false
+    maxBarbariansGroups : 0
   }
   		
   events :
@@ -37,23 +42,17 @@
       population : 30
       strong : 25
       exec : {
-        "step_1.video#messagebox" : {
-          title : "##city_fire_title##"
-          text : "##city_fire_text##"
-          video : ":/smk/city_fire.smk"
-        }
-
-        "step_2.fire#tutorial_window" : {
+        "step_1.fire#tutorial_window" : {
           tutorial : ":/tutorial/first_fire.tutorial"
         }
 
-        "step_3.prefecture#building_options" :  {
+        "step_2.prefecture#building_options" :  {
           buildings : { prefecture : true }
         }
       }
     }
 
-    "tutorial#random_collapse" : {
+    tutorial#random_collapse : {
       population : 60
       strong : 25
       exec : {
@@ -62,7 +61,7 @@
         }
 
         "enable_engineer#building_options" : {
-          buildings : { engineering_post : true, senate_1 : true }
+          buildings : { engineering_post : true, senate : true }
         }
       }
     }
@@ -91,6 +90,7 @@
 
     "wheat_upper#goods_updater" : {
       good : "wheat"
+      buildings : [ "market" ]
       date : "-350.01.01"
       endTime : "01.01.01"
       value : 80

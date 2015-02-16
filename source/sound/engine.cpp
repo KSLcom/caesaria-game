@@ -26,13 +26,14 @@
 #include <SDL_mixer.h>
 #include "game/settings.hpp"
 #include "core/exception.hpp"
+#include "thread/mutex.hpp"
 #include "core/logger.hpp"
 #include "core/foreach.hpp"
-#include "core/stringhelper.hpp"
+#include "core/utils.hpp"
 #include "vfs/filesystem.hpp"
 #include "vfs/file.hpp"
 
-static void _resolveChannelFinished(int channel)
+static void _resolveChannelFinished( int channel )
 {
   audio::Engine::instance().stop( channel );
 }
@@ -46,6 +47,7 @@ struct Sample
   std::string sound;
   audio::SoundType typeSound;
   int volume;
+  bool finished;
   Mix_Chunk* chunk;
 };
 
@@ -61,6 +63,8 @@ public:
   Volumes volumes;
   vfs::Path currentTheme;
 
+public:
+  void clearFinishedChannels();
   void checkFilename( vfs::Path& path );
 };
 
@@ -170,6 +174,11 @@ bool Engine::_loadSound(vfs::Path filename)
       return true;
     }
 
+    if( !filename.exist() )
+    {
+      return false;
+    }
+
     Sample sample;
 
     /* load the sample */
@@ -191,7 +200,6 @@ bool Engine::_loadSound(vfs::Path filename)
     }
 
     _d->samples[ filename.toString() ] = sample;
-    //Logger::warning( " Loaded %s to sample %i.",filename.toString().c_str(), _d->samples.size() );
   }
 
   return true;
@@ -201,6 +209,7 @@ int Engine::play( vfs::Path filename, int volValue, SoundType type )
 {
   if(_d->useSound )
   {
+    _d->clearFinishedChannels();
     _d->checkFilename( filename );
 
     if( type == themeSound )
@@ -230,6 +239,7 @@ int Engine::play( vfs::Path filename, int volValue, SoundType type )
 
       i->second.typeSound = type;
       i->second.volume = volValue;
+      i->second.finished = false;
 
       float result = math::clamp( volValue, 0, maxVolumeValue() ) / 100.f;
       float typeVolume = volume( type ) / 100.f;
@@ -246,7 +256,7 @@ int Engine::play( vfs::Path filename, int volValue, SoundType type )
 
 int Engine::play(std::string rc, int index, int volume, SoundType type)
 {
-  std::string filename = StringHelper::format( 0xff, "%s_%05d.ogg", rc.c_str(), index );
+  std::string filename = utils::format( 0xff, "%s_%05d.ogg", rc.c_str(), index );
   return play( filename, volume, type );
 }
 
@@ -290,9 +300,7 @@ void Engine::stop(int channel)
   {
     if( it->second.channel == channel )
     {
-      Mix_FreeChunk( it->second.chunk );
-
-      _d->samples.erase( it );
+      it->second.finished = true;
       return;
     }
   }
@@ -326,6 +334,23 @@ void Helper::initTalksArchive(const vfs::Path& filename)
 
   saveFilename = filename;
   vfs::FileSystem::instance().mountArchive( saveFilename );
+}
+
+void Engine::Impl::clearFinishedChannels()
+{
+  for( Samples::iterator it=samples.begin(); it != samples.end();  )
+  {
+    if( it->second.finished )
+    {
+      Mix_FreeChunk( it->second.chunk );
+
+      samples.erase( it++ );
+    }
+    else
+    {
+      ++it;
+    }
+  }
 }
 
 void Engine::Impl::checkFilename(vfs::Path& path)

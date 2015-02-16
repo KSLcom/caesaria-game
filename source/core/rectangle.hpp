@@ -128,32 +128,32 @@ public:
       UpperLeftCorner.setY( y );
   }
 
-	//! Returns if a 2d point is within this rectangle.
-	/** \param pos Position to test if it lies within this rectangle.
-	\return True if the position is within the rectangle, false if not. */
-	bool isPointInside(const Vector2<T>& pos) const
-	{
-		return (UpperLeftCorner.x() <= pos.x() &&
-			UpperLeftCorner.y() <= pos.y() &&
-			LowerRightCorner.x() >= pos.x() &&
-			LowerRightCorner.y() >= pos.y() );
-	}
+  //! Returns if a 2d point is within this rectangle.
+  /** \param pos Position to test if it lies within this rectangle.
+  \return True if the position is within the rectangle, false if not. */
+  bool isPointInside(const Vector2<T>& pos) const
+  {
+          return (UpperLeftCorner.x() <= pos.x() &&
+                  UpperLeftCorner.y() <= pos.y() &&
+                  LowerRightCorner.x() >= pos.x() &&
+                  LowerRightCorner.y() >= pos.y() );
+  }
 
-	//! Check if the rectangle collides with another rectangle.
-	/** \param other RectT to test collision with
-	\return True if the rectangles collide. */
-	bool isRectCollided(const RectT<T>& other) const
-	{
-		return (LowerRightCorner.y() > other.UpperLeftCorner.y() &&
-			UpperLeftCorner.y() < other.LowerRightCorner.y() &&
-			LowerRightCorner.x() > other.UpperLeftCorner.x() &&
-			UpperLeftCorner.x() < other.LowerRightCorner.x());
-	}
+  //! Check if the rectangle collides with another rectangle.
+  /** \param other RectT to test collision with
+  \return True if the rectangles collide. */
+  bool isRectCollided(const RectT<T>& other) const
+  {
+          return (LowerRightCorner.y() > other.UpperLeftCorner.y() &&
+                  UpperLeftCorner.y() < other.LowerRightCorner.y() &&
+                  LowerRightCorner.x() > other.UpperLeftCorner.x() &&
+                  UpperLeftCorner.x() < other.LowerRightCorner.x());
+  }
 
-	//! Clips this rectangle with another one.
-	/** \param other RectT to clip with */
-	void clipAgainst(const RectT<T>& other)
-	{
+  //! Clips this rectangle with another one.
+  /** \param other RectT to clip with */
+  void clipAgainst(const RectT<T>& other)
+  {
 		if (other.LowerRightCorner.x() < LowerRightCorner.x())
 			LowerRightCorner.setX( other.LowerRightCorner.x() );
 
@@ -252,7 +252,7 @@ public:
 	}
 
     //! Get the center of the rectangle
-	Vector2<T> getCenter() const
+  Vector2<T> center() const
 	{
 		return Vector2<T>(
 				(UpperLeftCorner.x() + LowerRightCorner.x()) / 2,
@@ -276,19 +276,19 @@ public:
            && LowerRightCorner.IsEqual( other.LowerRightCorner, tolerance);
   }
 
-	T top() const 	{		return UpperLeftCorner.y();	}
 	Vector2<T> righttop() const { return Vector2<T>( LowerRightCorner.x(), UpperLeftCorner.y() ); }
 	Vector2<T> leftbottom() const { return Vector2<T>( UpperLeftCorner.x(), LowerRightCorner.y() ); }
-	Vector2<T> lefttop() const { return UpperLeftCorner; }
-	Vector2<T> rightbottom() const { return LowerRightCorner; }
+  const Vector2<T>& lefttop() const { return UpperLeftCorner; }
+  const Vector2<T>& rightbottom() const { return LowerRightCorner; }
 
-  T& rtop() {		return UpperLeftCorner.ry();	}
-	T left() const	{		return UpperLeftCorner.x();	}
-  T& rleft() {		return UpperLeftCorner.rx();	}
-	T bottom() const	{		return LowerRightCorner.y();	}
-  T& rbottom() { return LowerRightCorner.ry();	}
-	T right() const	{		return LowerRightCorner.x();	}
-  T& rright() {	return LowerRightCorner.rx();	}
+  inline T top() const 	{		return UpperLeftCorner.y();   }
+  inline T& rtop()      {		return UpperLeftCorner.ry();	}
+  inline T left() const	{		return UpperLeftCorner.x();   }
+  inline T& rleft()     {		return UpperLeftCorner.rx();	}
+  inline T bottom()const{		return LowerRightCorner.y();	}
+  inline T& rbottom()   {   return LowerRightCorner.ry(); }
+  inline T right() const{		return LowerRightCorner.x();	}
+  inline T& rright()    {   return LowerRightCorner.rx(); }
 
 	//! Upper left corner
 	Vector2<T> UpperLeftCorner;

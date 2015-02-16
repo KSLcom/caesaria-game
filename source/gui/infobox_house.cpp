@@ -32,7 +32,7 @@
 #include "city/city.hpp"
 #include "objects/market.hpp"
 #include "objects/granary.hpp"
-#include "core/stringhelper.hpp"
+#include "core/utils.hpp"
 #include "good/goodhelper.hpp"
 #include "objects/farm.hpp"
 #include "objects/entertainment.hpp"
@@ -51,8 +51,13 @@
 #include "objects/constants.hpp"
 #include "events/event.hpp"
 #include "game/settings.hpp"
+#include "widget_helper.hpp"
 #include "image.hpp"
 #include "game/gamedate.hpp"
+#include "dictionary.hpp"
+#include "pushbutton.hpp"
+#include "environment.hpp"
+#include "dialogbox.hpp"
 
 using namespace constants;
 using namespace gfx;
@@ -63,7 +68,7 @@ namespace gui
 namespace infobox
 {
 
-AboutHouse::AboutHouse( Widget* parent, const Tile& tile )
+AboutHouse::AboutHouse(Widget* parent, PlayerCityPtr city, const Tile& tile )
   : Simple( parent, Rect( 0, 0, 510, 360 ), Rect( 16, 150, 510 - 16, 360 - 50 ) )
 {
   setupUI( ":/gui/infoboxhouse.gui" );
@@ -86,18 +91,17 @@ AboutHouse::AboutHouse( Widget* parent, const Tile& tile )
     }
 
     houseInfo->setText( _(text) );
-  }
+  }  
 
-  std::string workerState = StringHelper::format( 0xff, "hb=%d hr=%d nb=%d ch=%d sch=%d st=%d mt=%d old=%d",
-                                                  _house->habitants().count(),
-                                                  (int)_house->getServiceValue( Service::recruter ),
-                                                  _house->habitants().count( CitizenGroup::newborn ),
-                                                  _house->habitants().count( CitizenGroup::child ),
-                                                  _house->habitants().count( CitizenGroup::scholar ),
-                                                  _house->habitants().count( CitizenGroup::student ),
-                                                  _house->habitants().count( CitizenGroup::mature ),
-                                                  _house->habitants().count( CitizenGroup::aged ) );
-  new Label( this, Rect( 16, 125, width() - 16, 150 ), workerState );
+  INIT_WIDGET_FROM_UI( TexturedButton*, btnHelp )
+  if( btnHelp )
+  {
+    Rect rect = btnHelp->relativeRect();
+    rect += Point( btnHelp->width() + 5, 0 );
+    rect.rright() += 40;
+    PushButton* btn = new PushButton( this, rect, "Info", -1, false, PushButton::whiteBorderUp );
+    CONNECT( btn, onClicked(), this, AboutHouse::_showInformation )
+  }
 
   drawHabitants( _house );
 
@@ -107,12 +111,12 @@ AboutHouse::AboutHouse( Widget* parent, const Tile& tile )
   {
     if( _house->getServiceValue( Service::forum ) > 0 )
     {
-      taxesStr = StringHelper::format( 0xff, "%d %s", taxes, _("##house_pay_tax##") );
+      taxesStr = utils::format( 0xff, "%d %s", taxes, _("##house_pay_tax##") );
     }
     else
     {
       DateTime lastTax = _house->lastTaxationDate();
-      if( GameDate::current().year() > lastTax.year() )
+      if( game::Date::current().year() > lastTax.year() )
       {
         taxesStr = "##no_tax_in_this_year##";
       }
@@ -131,11 +135,11 @@ AboutHouse::AboutHouse( Widget* parent, const Tile& tile )
   int startY = lbCrime->bottom() + 10;
   if( _house->spec().level() > 2 )
   {
-    drawGood( _house, Good::wheat, 0, 0, startY );
-    drawGood( _house, Good::fish, 1, 0, startY );
-    drawGood( _house, Good::meat, 2, 0, startY );
-    drawGood( _house, Good::fruit, 3, 0, startY );
-    drawGood( _house, Good::vegetable, 4, 0, startY );
+    drawGood( _house, good::wheat, 0, 0, startY );
+    drawGood( _house, good::fish, 1, 0, startY );
+    drawGood( _house, good::meat, 2, 0, startY );
+    drawGood( _house, good::fruit, 3, 0, startY );
+    drawGood( _house, good::vegetable, 4, 0, startY );
   }
   else
   {
@@ -147,10 +151,10 @@ AboutHouse::AboutHouse( Widget* parent, const Tile& tile )
     startY = lb->top();
   }
 
-  drawGood( _house, Good::pottery, 0, 1, startY );
-  drawGood( _house, Good::furniture, 1, 1, startY );
-  drawGood( _house, Good::oil, 2, 1, startY );
-  drawGood( _house, Good::wine, 3, 1, startY );
+  drawGood( _house, good::pottery, 0, 1, startY );
+  drawGood( _house, good::furniture, 1, 1, startY );
+  drawGood( _house, good::oil, 2, 1, startY );
+  drawGood( _house, good::wine, 3, 1, startY );
 }
 
 AboutHouse::~AboutHouse() {}
@@ -172,30 +176,30 @@ void AboutHouse::drawHabitants( HousePtr house )
   if( freeRoom > 0 )
   {
     // there is some room for new habitants!
-    freeRoomText = StringHelper::format( 0xff, "%d %s %d", current, _("##citizens_additional_rooms_for##"), freeRoom);
+    freeRoomText = utils::format( 0xff, "%d %s %d", current, _("##citizens_additional_rooms_for##"), freeRoom);
   }
   else if (freeRoom == 0)
   {
     // full house!
-    freeRoomText = StringHelper::format( 0xff, "%d %s", current, _("##occupants##"));
+    freeRoomText = utils::format( 0xff, "%d %s", current, _("##occupants##"));
   }
   else if (freeRoom < 0)
   {
     // too many habitants!
-    freeRoomText = StringHelper::format( 0xff, "%d %s %d", current, _("##no_room_for_citizens##"),-freeRoom);
+    freeRoomText = utils::format( 0xff, "%d %s %d", current, _("##no_room_for_citizens##"),-freeRoom);
     lbHabitants->setFont( Font::create( FONT_2_RED ) );
   }
 
   lbHabitants->setText( freeRoomText );
 }
 
-void AboutHouse::drawGood( HousePtr house, const Good::Type &goodType, const int col, const int row, const int startY )
+void AboutHouse::drawGood(HousePtr house, const good::Product& goodType, const int col, const int row, const int startY )
 {
   int qty = house->goodStore().qty( goodType );
-  std::string text = StringHelper::format( 0xff, "%d", qty);
+  std::string text = utils::format( 0xff, "%d", qty);
 
   // pictures of goods
-  const Picture& pic = GoodHelper::picture( goodType );
+  const Picture& pic = good::Helper::picture( goodType );
   Label* lb = new Label( this, Rect( Point( 30 + 100 * col, startY + 2 + 30 * row), Size( 80, 50) ) );
   lb->setFont( Font::create( FONT_2 ) );
   lb->setIcon( pic );
@@ -223,6 +227,25 @@ bool AboutHouse::onEvent(const NEvent& event)
   }
 
   return Simple::onEvent( event );
+}
+
+void AboutHouse::_showHelp() {  DictionaryWindow::show( this, "house" ); }
+
+void AboutHouse::_showInformation()
+{
+  std::string workerState = utils::format( 0xff, "Live=%d\nMay work=%d\nNewborn=%d\nChild=%d\nIn school=%d\nStudents=%d\nMature=%d\nAged(not work)=%d",
+                                                  _house->habitants().count(),
+                                                  (int)_house->getServiceValue( Service::recruter ),
+                                                  _house->habitants().count( CitizenGroup::newborn ),
+                                                  _house->habitants().count( CitizenGroup::child ),
+                                                  _house->habitants().count( CitizenGroup::scholar ),
+                                                  _house->habitants().count( CitizenGroup::student ),
+                                                  _house->habitants().count( CitizenGroup::mature ),
+                                                  _house->habitants().count( CitizenGroup::aged ) );
+
+  DialogBox* dialog = new DialogBox( ui()->rootWidget(), Rect( 0, 0, 400, 400 ), "Habitants", workerState, DialogBox::btnOk );
+  dialog->setCenter( ui()->rootWidget()->center() );
+  CONNECT( dialog, onOk(), dialog, DialogBox::deleteLater )
 }
 
 }

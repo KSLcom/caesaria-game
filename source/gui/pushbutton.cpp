@@ -18,6 +18,7 @@
 #include "pushbutton.hpp"
 #include "core/event.hpp"
 #include "core/time.hpp"
+#include "core/variant_map.hpp"
 #include "environment.hpp"
 #include "gfx/decorator.hpp"
 #include "gfx/engine.hpp"
@@ -73,7 +74,7 @@ public:
   ElementState currentButtonState, lastButtonState;
   ButtonState buttonStates[ StateCount ];
 
-oc3_signals public:
+signals public:
   Signal0<> onClickedSignal;
 
 public:
@@ -255,7 +256,8 @@ void PushButton::setupUI(const VariantMap &ui)
   }
 
   setIsPushButton( (bool)ui.get( "pushbutton" ) );
-  _d->textOffset = ui.get( "textOffset" ).toPoint();
+  _d->textOffset = ui.get( "textOffset" );
+  _d->textOffset = ui.get( "text.offset", _d->textOffset );
   setEnabled( (bool)ui.get( "enabled", true ) );
 
   Variant vFont = ui.get( "font" );
@@ -417,7 +419,7 @@ void PushButton::_btnClicked()
 {
   parent()->onEvent( NEvent::Gui( this, 0, guiButtonClicked ) );
 
-  onClicked().emit();
+  emit _dfunc()->onClickedSignal();
 }
 
 Signal0<>& PushButton::onClicked() { return _dfunc()->onClickedSignal; }

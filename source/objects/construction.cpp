@@ -24,8 +24,9 @@
 #include "events/disaster.hpp"
 #include "core/logger.hpp"
 #include "core/foreach.hpp"
-#include "core/stringhelper.hpp"
+#include "core/utils.hpp"
 #include "extension.hpp"
+#include "core/json.hpp"
 
 using namespace gfx;
 
@@ -36,6 +37,7 @@ public:
   TilesArray accessRoads;
   Params params;
 
+  ConstructionExtensionList newExtensions;
   ConstructionExtensionList extensions;
 };
 
@@ -46,14 +48,14 @@ Construction::Construction(const Type type, const Size& size)
   _d->params[ damage ] = 0;
 }
 
-bool Construction::canBuild(PlayerCityPtr city, TilePos pos , const TilesArray& ) const
+bool Construction::canBuild(const CityAreaInfo& areaInfo) const
 {
-  Tilemap& tilemap = city->tilemap();
+  Tilemap& tilemap = areaInfo.city->tilemap();
 
   bool is_constructible = true;
 
   //return area for available tiles
-  TilesArray area = tilemap.getArea( pos, size() );
+  TilesArray area = tilemap.getArea( areaInfo.pos, size() );
 
   //on over map size
   if( (int)area.size() != size().area() )
@@ -80,7 +82,7 @@ std::string Construction::troubleDesc() const
     const char* troubleName[] = { "some", "have", "most" };
     lvlTrouble = std::max( fire, damage );
     const char* typelvl = ( fire > damage ) ? "fire" : "damage";
-    return StringHelper::format( 0xff, "##trouble_%s_%s##", troubleName[ (int)((lvlTrouble-50) / 25) ], typelvl );
+    return utils::format( 0xff, "##trouble_%s_%s##", troubleName[ (int)((lvlTrouble-50) / 25) ], typelvl );
   }
 
   return "";
@@ -93,13 +95,13 @@ void Construction::destroy() { TileOverlay::destroy(); }
 bool Construction::isNeedRoadAccess() const{ return true; }
 Construction::~Construction() {}
 
-bool Construction::build(PlayerCityPtr city, const TilePos& pos )
+bool Construction::build( const CityAreaInfo& info )
 {
-  TileOverlay::build( city, pos );
+  TileOverlay::build( info );
 
-  std::string name =  StringHelper::format( 0xff, "%s_%d_%d",
+  std::string name =  utils::format( 0xff, "%s_%d_%d",
                                             MetaDataHolder::findTypename( type() ).c_str(),
-                                            pos.i(), pos.j() );
+                                            info.pos.i(), info.pos.j() );
   setName( name );
 
   computeAccessRoads();
@@ -139,20 +141,23 @@ void Construction::burn()
 {
   deleteLater();
 
-  events::GameEventPtr event = events::DisasterEvent::create( tile(), events::DisasterEvent::fire );
+  events::GameEventPtr event = events::Disaster::create( tile(), events::Disaster::fire );
   event->dispatch();
 
-  Logger::warning( "Building catch fire at %d,%d!", pos().i(), pos().j() );
+  Logger::warning( "Construction catch fire at %d,%d!", pos().i(), pos().j() );
 }
 
 void Construction::collapse()
 {
+  if( isDeleted() )
+    return;
+
   deleteLater();
 
-  events::GameEventPtr event = events::DisasterEvent::create( tile(), events::DisasterEvent::collapse );
+  events::GameEventPtr event = events::Disaster::create( tile(), events::Disaster::collapse );
   event->dispatch();
 
-  Logger::warning( "Building collapsed at %d,%d!", pos().i(), pos().j() );
+  Logger::warning( "Construction collapsed at %d,%d!", pos().i(), pos().j() );
 }
 
 const Picture& Construction::picture() const { return TileOverlay::picture(); }
@@ -176,6 +181,16 @@ void Construction::save( VariantMap& stream) const
     vl_states.push_back( VariantList() << (int)it->first << (double)it->second );
   }
 
+  VariantMap vm_extensions;
+  int extIndex = 0;
+  foreach( it, _d->extensions )
+  {
+    VariantMap vmExt;
+    (*it)->save( vmExt );
+    vm_extensions[ utils::i2str( extIndex++ ) ] = vmExt;
+  }
+
+  stream[ "extensions" ] = vm_extensions;
   stream[ "states" ] = vl_states;
 }
 
@@ -188,10 +203,49 @@ void Construction::load( const VariantMap& stream )
     const VariantList& param = it->toList();
     _d->params[ (Construction::Param)param.get( 0 ).toInt() ] = param.get( 1, 0.f ).toDouble();
   }
+
+  VariantMap vm_extensions = stream.get( "extensions" ).toMap();
+  foreach( it, vm_extensions )
+  {
+    ConstructionExtensionPtr extension = ExtensionsFactory::instance().create( it->second.toMap() );
+    if( extension.isValid() )
+    {
+      addExtension( extension );
+    }
+    else
+    {
+      Logger::warning( "Construction: cant load extension from " + Json::serialize( it->second, " " ) );
+    }
+  }
 }
 
-void Construction::addExtension(ConstructionExtensionPtr ext) {  _d->extensions.push_back( ext ); }
+void Construction::addExtension(ConstructionExtensionPtr ext) {  _d->newExtensions.push_back( ext ); }
 const ConstructionExtensionList&Construction::extensions() const { return _d->extensions; }
+
+void Construction::initialize(const MetaData& mdata)
+{
+  TileOverlay::initialize( mdata );
+
+  VariantMap anMap = mdata.getOption( "animation" ).toMap();
+  if( !anMap.empty() )
+  {
+    Animation anim;
+
+    anim.load( anMap.get( "rc" ).toString(), anMap.get( "start" ).toInt(),
+               anMap.get( "count" ).toInt(), anMap.get( "reverse", false ).toBool(),
+               anMap.get( "step", 1 ).toInt() );
+
+    Variant v_offset = anMap.get( "offset" );
+    if( v_offset.isValid() )
+    {
+      anim.setOffset( v_offset.toPoint() );
+    }
+
+    anim.setDelay( (unsigned int)anMap.get( "delay", 1u ) );
+
+    setAnimation( anim );
+  }
+}
 
 double Construction::state( ParameterType param) const { return _d->params[ param ]; }
 
@@ -219,16 +273,22 @@ void Construction::timeStep(const unsigned long time)
   for( ConstructionExtensionList::iterator it=_d->extensions.begin();
        it != _d->extensions.end(); )
   {
-    (*it)->run( this, time );
+    (*it)->timeStep( this, time );
 
     if( (*it)->isDeleted() ) { it = _d->extensions.erase( it ); }
     else { ++it; }
   }
 
+  if( !_d->newExtensions.empty() )
+  {
+    _d->extensions << _d->newExtensions;
+    _d->newExtensions.clear();
+  }
+
   TileOverlay::timeStep( time );
 }
 
-const Picture& Construction::picture(PlayerCityPtr city, TilePos pos, const TilesArray& aroundTiles) const
+const Picture& Construction::picture(const CityAreaInfo& areaInfo) const
 {
   return TileOverlay::picture();
 }

@@ -26,16 +26,9 @@ using namespace gfx;
 namespace city
 {
 
-const int waterDecreaseInterval = GameDate::days2ticks( 5 );
+const int waterDecreaseInterval = game::Date::days2ticks( 5 );
 
-class Water::Impl
-{
-public:
-  PlayerCityPtr city;
-  TilesArray tiles;
-};
-
-city::SrvcPtr Water::create(PlayerCityPtr city )
+city::SrvcPtr Water::create( PlayerCityPtr city )
 {
   city::SrvcPtr ret( new Water( city ) );
   ret->drop();
@@ -43,18 +36,17 @@ city::SrvcPtr Water::create(PlayerCityPtr city )
   return ret;
 }
 
-Water::Water(PlayerCityPtr city )
-  : city::Srvc( *city.object(), "water" ), _d( new Impl )
+Water::Water( PlayerCityPtr city )
+  : city::Srvc( city, CAESARIA_STR_EXT(Water) )
 {
-  _d->city = city;
-  _d->tiles = city->tilemap().allTiles();
 }
 
-void Water::update( const unsigned int time )
-{
+void Water::timeStep( const unsigned int time )
+{  
   if( time % waterDecreaseInterval == 0 )
   {
-    foreach( it, _d->tiles )
+    const TilesArray& tiles = _city()->tilemap().allTiles();
+    foreach( it, tiles )
     {
       Tile* tile = *it;
       int value = tile->param( Tile::pFountainWater );

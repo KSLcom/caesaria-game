@@ -18,13 +18,16 @@
 #ifndef __CAESARIA_LAYERCRIME_H_INCLUDED__
 #define __CAESARIA_LAYERCRIME_H_INCLUDED__
 
-#include "layer.hpp"
+#include "layerinfo.hpp"
 #include "city_renderer.hpp"
 
 namespace gfx
 {
 
-class LayerCrime : public Layer
+namespace layer
+{
+
+class Crime : public Info
 {
 public:
   virtual int type() const;
@@ -32,9 +35,12 @@ public:
 
   static LayerPtr create( Camera& camera, PlayerCityPtr city );
   virtual void handleEvent(NEvent &event);
+
 private:
-  LayerCrime(Camera& camera, PlayerCityPtr city );
+  Crime(Camera& camera, PlayerCityPtr city );
 };
+
+}//end namespace layer
 
 }//end namespace gfx
 #endif //__CAESARIA_LAYERCRIME_H_INCLUDED__

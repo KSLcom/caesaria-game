@@ -19,8 +19,11 @@
 #include "game/resourcegroup.hpp"
 #include "gfx/tilemap.hpp"
 #include "core/foreach.hpp"
+#include "walkers_factory.hpp"
 
 using namespace constants;
+
+REGISTER_CLASS_IN_WALKERFACTORY(walker::bow_arrow, BowArrow)
 
 BowArrowPtr BowArrow::create(PlayerCityPtr city)
 {
@@ -32,7 +35,7 @@ BowArrowPtr BowArrow::create(PlayerCityPtr city)
 
 void BowArrow::_onTarget()
 {
-  WalkerList walkers = _city()->walkers( walker::any, dstPos() );
+  const WalkerList& walkers = _city()->walkers( dstPos() );
   foreach( w, walkers )
   {
     (*w)->updateHealth( -3 );

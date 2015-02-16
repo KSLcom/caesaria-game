@@ -22,6 +22,7 @@
 #include "core/position.hpp"
 #include "servicewalker_helper.hpp"
 #include "city/helper.hpp"
+#include "core/variant_map.hpp"
 #include "game/enums.hpp"
 #include "game/resourcegroup.hpp"
 #include "pathway/path_finding.hpp"
@@ -30,8 +31,11 @@
 #include "corpse.hpp"
 #include "core/foreach.hpp"
 #include "helper.hpp"
+#include "walkers_factory.hpp"
 
 using namespace constants;
+
+REGISTER_CLASS_IN_WALKERFACTORY(walker::recruter, Recruter)
 
 namespace {
 CAESARIA_LITERALCONST(priority)
@@ -41,7 +45,7 @@ static const int noPriority = 999;
 class Recruter::Impl
 {
 public:
-  typedef std::map< building::Group, int > PriorityMap;
+  typedef std::map< objects::Group, int > PriorityMap;
 
   unsigned int needWorkers;
   city::HirePriorities priority;
@@ -77,7 +81,7 @@ void Recruter::setPriority(const city::HirePriorities& priority)
   int priorityLevel = 1;
   foreach( i, _d->priority )
   {
-    city::Industry::BuildingGroups groups = city::Industry::toGroups( *i );
+    city::industry::BuildingGroups groups = city::industry::toGroups( *i );
     foreach( grIt, groups )
     {
       _d->priorityMap[ *grIt ] = priorityLevel;
@@ -168,6 +172,17 @@ void Recruter::timeStep(const unsigned long time)
   ServiceWalker::timeStep( time );
 }
 
+TilePos Recruter::places(Walker::Place type) const
+{
+  switch( type )
+  {
+  case plOrigin: return base().isValid() ? base()->pos() : TilePos( -1, -1 );
+  default: break;
+  }
+
+  return ServiceWalker::places( type );
+}
+
 unsigned int Recruter::reachDistance() const { return _d->reachDistance;}
 
 void Recruter::save(VariantMap& stream) const
@@ -199,8 +214,8 @@ bool Recruter::die()
 
 bool Recruter::Impl::isMyPriorityOver(BuildingPtr base, WorkingBuildingPtr wbuilding)
 {
-  PriorityMap::iterator myPrIt = priorityMap.find( (building::Group)base->group() );
-  PriorityMap::iterator bldPrIt = priorityMap.find( (building::Group)wbuilding->group() );
+  PriorityMap::iterator myPrIt = priorityMap.find( (objects::Group)base->group() );
+  PriorityMap::iterator bldPrIt = priorityMap.find( (objects::Group)wbuilding->group() );
   int mypriority = (myPrIt != priorityMap.end() ? myPrIt->second : noPriority);
   int wpriority = (bldPrIt != priorityMap.end() ? bldPrIt->second : noPriority);
 

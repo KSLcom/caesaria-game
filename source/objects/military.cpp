@@ -31,12 +31,17 @@
 #include "walker/romehorseman.hpp"
 #include "walker/helper.hpp"
 #include "walker/romearcher.hpp"
+#include "objects_factory.hpp"
 
 using namespace constants;
 using namespace gfx;
 
+REGISTER_CLASS_IN_OVERLAYFACTORY(objects::fort_javelin, FortJaveline)
+REGISTER_CLASS_IN_OVERLAYFACTORY(objects::fort_horse, FortMounted)
+REGISTER_CLASS_IN_OVERLAYFACTORY(objects::fort_legionaries, FortLegionary)
+
 FortLegionary::FortLegionary()
-  : Fort( building::fortLegionaire, 16 )
+  : Fort( objects::fort_legionaries, 16 )
 {
   setPicture( ResourceGroup::security, 12 );
   _setFlagIndex( 21 );
@@ -44,7 +49,7 @@ FortLegionary::FortLegionary()
   _addFormation( frmNorthDblLine );
   _addFormation( frmWestDblLine );
   _addFormation( frmSquad );
-  _addFormation( frmRandomLocation );
+  _addFormation( frmOpen );
 }
 
 void FortLegionary::_readyNewSoldier()
@@ -60,7 +65,7 @@ void FortLegionary::_readyNewSoldier()
 }
 
 FortMounted::FortMounted()
-  : Fort( constants::building::fortMounted, 15 )
+  : Fort( constants::objects::fort_horse, 15 )
 {
   setPicture( ResourceGroup::security, 12 );
   _setFlagIndex( 39 );
@@ -69,12 +74,12 @@ FortMounted::FortMounted()
   _addFormation( frmWestLine );
   _addFormation( frmNorthDblLine );
   _addFormation( frmWestDblLine );
-  _addFormation( frmRandomLocation );
+  _addFormation( frmOpen );
 }
 
-bool FortMounted::build(PlayerCityPtr city, const TilePos& pos)
+bool FortMounted::build( const CityAreaInfo& info )
 {
-  return Fort::build( city, pos );
+  return Fort::build( info );
 }
 
 void FortMounted::_readyNewSoldier()
@@ -90,14 +95,14 @@ void FortMounted::_readyNewSoldier()
 }
 
 FortJaveline::FortJaveline()
-  : Fort( building::fortJavelin, 14 )
+  : Fort( objects::fort_javelin, 14 )
 {
   setPicture( ResourceGroup::security, 12 );
   _setFlagIndex( 30 );
 
   _addFormation( frmNorthDblLine );
   _addFormation( frmWestDblLine );
-  _addFormation( frmRandomLocation );
+  _addFormation( frmOpen );
 }
 
 void FortJaveline::_readyNewSoldier()

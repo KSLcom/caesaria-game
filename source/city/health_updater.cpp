@@ -20,6 +20,7 @@
 #include "objects/construction.hpp"
 #include "helper.hpp"
 #include "city.hpp"
+#include "core/variant_map.hpp"
 #include "game/gamedate.hpp"
 #include "objects/house.hpp"
 #include "core/logger.hpp"
@@ -40,23 +41,22 @@ public:
 
 SrvcPtr HealthUpdater::create( PlayerCityPtr city )
 {
-  HealthUpdater* e = new HealthUpdater( city );
-
-  SrvcPtr ret( e );
+  SrvcPtr ret( new HealthUpdater( city ) );
   ret->drop();
 
   return ret;
 }
 
-void HealthUpdater::update( const unsigned int time)
+void HealthUpdater::timeStep( const unsigned int time)
 {
-  if( GameDate::isMonthChanged() )
+  if( game::Date::isMonthChanged() )
   {
-    _d->isDeleted = (_d->endTime < GameDate::current());
+    _d->isDeleted = (_d->endTime < game::Date::current());
 
     Logger::warning( "HealthUpdater: execute service" );
-    Helper helper( &_city );
-    HouseList houses = helper.find<House>( building::house );
+    Helper helper( _city() );
+    HouseList houses = helper.find<House>( objects::house );
+
     foreach( it, houses )
     {
       (*it)->updateState( House::health, _d->value );
@@ -82,8 +82,8 @@ VariantMap HealthUpdater::save() const
   return ret;
 }
 
-HealthUpdater::HealthUpdater( PlayerCityPtr city )
-  : Srvc( *city.object(), HealthUpdater::defaultName() ), _d( new Impl )
+HealthUpdater::HealthUpdater(PlayerCityPtr city )
+  : Srvc( city, HealthUpdater::defaultName() ), _d( new Impl )
 {
   _d->isDeleted = false;
 }

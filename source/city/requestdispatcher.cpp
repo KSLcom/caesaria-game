@@ -20,9 +20,10 @@
 #include "request.hpp"
 #include "game/gamedate.hpp"
 #include "events/showrequestwindow.hpp"
+#include "core/variant_map.hpp"
 #include "core/foreach.hpp"
 #include "core/logger.hpp"
-#include "core/stringhelper.hpp"
+#include "core/utils.hpp"
 
 namespace city
 {
@@ -34,19 +35,21 @@ class Dispatcher::Impl
 {
 public:
   RequestList requests;
+  RequestList newRequests;
   DateTime lastRequestCancelDate;
+
+public:
+  void updateRequests();
 };
 
 Dispatcher::Dispatcher( PlayerCityPtr city )
-  : Srvc( *city.object(), defaultName() ), _d( new Impl )
+  : Srvc( city, defaultName() ), _d( new Impl )
 {
 }
 
-city::SrvcPtr Dispatcher::create(PlayerCityPtr city)
+city::SrvcPtr Dispatcher::create( PlayerCityPtr city )
 {
-  Dispatcher* cd = new Dispatcher( city );
-
-  SrvcPtr ret( cd );
+  SrvcPtr ret( new Dispatcher( city ) );
   ret->drop();
 
   return ret;
@@ -58,7 +61,7 @@ bool Dispatcher::add( const VariantMap& stream, bool showMessage )
   if( type == RqGood::typeName() )
   {
     RequestPtr r = RqGood::create( stream );
-    _d->requests.push_back( r );
+    _d->newRequests.push_back( r );
 
     if( showMessage )
     {
@@ -68,39 +71,40 @@ bool Dispatcher::add( const VariantMap& stream, bool showMessage )
     return true;
   }
 
-  Logger::warning( "CityRequestDispatcher: cannot load request with type " + type );
+  Logger::warning( "WARNING!!! CityRequestDispatcher: cannot load request with type " + type );
   return false;
 }
 
 Dispatcher::~Dispatcher() {}
 std::string Dispatcher::defaultName(){  return "requests";}
 
-void Dispatcher::update(const unsigned int time)
+void Dispatcher::timeStep(const unsigned int time)
 {
-  if( GameDate::isWeekChanged() )
+  if( game::Date::isWeekChanged() )
   {
     foreach( rq, _d->requests )
     {
       RequestPtr request = *rq;
-      if( request->finishedDate() <= GameDate::current() )
+      if( request->finishedDate() <= game::Date::current() )
       {
-        request->fail( &_city );
-        _d->lastRequestCancelDate = GameDate::current();
+        request->fail( _city() );
+        _d->lastRequestCancelDate = game::Date::current();
       }
 
-      if( !request->isAnnounced() && request->isReady( &_city ) )
+      bool isReady = request->isReady( _city() );
+      isReady;
+
+      if( !request->isAnnounced() )
       {
         events::GameEventPtr e = events::ShowRequestInfo::create( request, true );
         request->setAnnounced( true );
         e->dispatch();
       }
+
+      request->update();
     }
 
-    for( RequestList::iterator i=_d->requests.begin(); i != _d->requests.end(); )
-    {
-      if( (*i)->isDeleted() ) { i = _d->requests.erase( i ); }
-      else { ++i; }
-    }
+    _d->updateRequests();
   }
 }
 
@@ -111,7 +115,7 @@ VariantMap Dispatcher::save() const
 
   foreach( rq, _d->requests )
   {
-    std::string name = StringHelper::format( 0xff, "request_%02d", std::distance( _d->requests.begin(), rq ) );
+    std::string name = utils::format( 0xff, "request_%02d", std::distance( _d->requests.begin(), rq ) );
     vm_rq[ name ] = (*rq)->save();
   }
 
@@ -133,10 +137,22 @@ void Dispatcher::load(const VariantMap& stream)
 
 bool Dispatcher::haveCanceledRequest() const
 {
-  return _d->lastRequestCancelDate.monthsTo( GameDate::current() ) < DateTime::monthsInYear;
+  return _d->lastRequestCancelDate.monthsTo( game::Date::current() ) < DateTime::monthsInYear;
 }
 
 RequestList Dispatcher::requests() const {  return _d->requests; }
+
+void Dispatcher::Impl::updateRequests()
+{
+  for( RequestList::iterator i=requests.begin(); i != requests.end(); )
+  {
+    if( (*i)->isDeleted() ) { i = requests.erase( i ); }
+    else { ++i; }
+  }
+
+  requests << newRequests;
+  newRequests.clear();
+}
 
 }//end namespace request
 

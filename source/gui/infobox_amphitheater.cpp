@@ -22,7 +22,7 @@
 #include "label.hpp"
 #include "core/gettext.hpp"
 #include "game/gamedate.hpp"
-#include "core/stringhelper.hpp"
+#include "core/utils.hpp"
 
 using namespace gfx;
 using namespace constants;
@@ -33,12 +33,15 @@ namespace gui
 namespace infobox
 {
 
-AboutAmphitheater::AboutAmphitheater(Widget *parent, const Tile &tile)
+AboutAmphitheater::AboutAmphitheater(Widget *parent, PlayerCityPtr city, const Tile &tile)
   : AboutConstruction( parent, Rect( 0, 0, 470, 300), Rect( 16, 145, 470 - 16, 145 + 100 ) )
 {
+  setupUI( ":/gui/infoboxapmhitheater.gui" );
+
   AmphitheaterPtr amph = ptr_cast<Amphitheater>(tile.overlay());
-  setConstruction( ptr_cast<Construction>( amph ) );
-  setTitle( _( MetaDataHolder::findPrettyName( building::amphitheater ) ) );
+  setBase( ptr_cast<Construction>( amph ) );
+  setTitle( _( MetaDataHolder::findPrettyName( objects::amphitheater ) ) );
+  _setWorkingVisible( true );
 
   _updateWorkersLabel( Point( 40, 150), 542, amph->maximumWorkers(), amph->numberWorkers() );
   
@@ -52,7 +55,7 @@ AboutAmphitheater::AboutAmphitheater(Widget *parent, const Tile &tile)
     if( amph->isShowGladiatorBouts() )
     {
       DateTime lastGlBoutDate = amph->lastBoutsDate();
-      text = StringHelper::format( 0xff, "%s %d %s", "##amphitheater_gladiator_contest_runs##", lastGlBoutDate.daysTo( GameDate::current() ), "##days##" );
+      text = utils::format( 0xff, "%s %d %s", "##amphitheater_gladiator_contest_runs##", lastGlBoutDate.daysTo( game::Date::current() ), "##days##" );
     }
     new Label( this, Rect( 35, 200, width() - 35, 200 + 20 ), text );
 
@@ -60,7 +63,7 @@ AboutAmphitheater::AboutAmphitheater(Widget *parent, const Tile &tile)
     if( amph->isActorsShow() )
     {
       DateTime lastShowDate = amph->lastShowDate();
-      text = StringHelper::format( 0xff, "%s %d %s", "##amphitheater_show_runs##", lastShowDate.daysTo( GameDate::current() ), "##days##" );
+      text = utils::format( 0xff, "%s %d %s", "##amphitheater_show_runs##", lastShowDate.daysTo( game::Date::current() ), "##days##" );
     }
 
     new Label( this, Rect( 35, 220, width() - 35, 220 + 20 ), text );

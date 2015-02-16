@@ -37,6 +37,7 @@ public:
   __RCG_NAME aqueduct;
   __RCG_NAME road;
   __RCG_NAME land1a;
+  __RCG_NAME meadow;
   __RCG_NAME entertaiment;
   __RCG_NAME warehouse;
   __RCG_NAME housing;
@@ -58,6 +59,7 @@ public:
   __RCG_NAME wall;
   __RCG_NAME hippodrome;
   __RCG_NAME celts;
+  __RCG_NAME roadBlock;
 };
 
 class ResourceMenu

@@ -24,19 +24,24 @@
 namespace gui
 {
 
-class ChangeSalaryWindow : public Window
+namespace dialog
+{
+
+class ChangeSalary : public Window
 {
 public:
-  ChangeSalaryWindow(Widget* p, unsigned int salary );
+  ChangeSalary(Widget* p, unsigned int salary );
 
-  virtual ~ChangeSalaryWindow();
+  virtual ~ChangeSalary();
 
-public oc3_signals:
+public signals:
   Signal1<int>& onChangeSalary();
 
 private:
   __DECLARE_IMPL(ChangeSalaryWindow)
 };
+
+}//end namespace dialog
 
 } //end namespace gui
 

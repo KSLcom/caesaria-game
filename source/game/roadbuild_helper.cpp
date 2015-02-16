@@ -15,10 +15,7 @@
 
 #include "roadbuild_helper.hpp"
 
-#include <set>
-#include <map>
-
-#include "core/stringhelper.hpp"
+#include "core/utils.hpp"
 #include "core/exception.hpp"
 #include "core/position.hpp"
 #include "pathway/astarpathfinding.hpp"
@@ -26,22 +23,38 @@
 #include "objects/construction.hpp"
 #include "pathway/pathway.hpp"
 #include "pathway/pathway_helper.hpp"
+#include "objects/aqueduct.hpp"
 #include "core/logger.hpp"
+#include "city/city.hpp"
 
 using namespace gfx;
 
-// comparison (for sorting list of tiles by their coordinates)
-bool
-compare_tiles_(const Tile * first, const Tile * second)
+void RoadPropagator::canBuildRoad(const gfx::Tile* tile, bool& ret)
 {
-  if (first->i() < second->i())
-    return true;
+  ret = false;
+  if( tile->getFlag( Tile::isConstructible ) || tile->getFlag( Tile::tlRoad ) )
+  {
+    ret = true;
+  }
+  else
+  {
+    if( is_kind_of<Aqueduct>( tile->overlay() ) )
+    {
+      AqueductPtr aq = ptr_cast<Aqueduct>( tile->overlay() );
+      ret = aq->canAddRoad( PlayerCityPtr(), tile->pos() );
+    }
+  }
+}
 
-  else if (first->i() == second->i() &&
-           first->j() > second->j())
-    return true;
+RoadPropagator::RoadPropagator()
+{
 
-  return false;
+}
+
+RoadPropagator& RoadPropagator::instance()
+{
+  static RoadPropagator inst;
+  return inst;
 }
 
 TilesArray RoadPropagator::createPath(Tilemap& tileMap, TilePos startPos, TilePos stopPos,
@@ -82,8 +95,6 @@ TilesArray RoadPropagator::createPath(Tilemap& tileMap, TilePos startPos, TilePo
       ret.append( tileMap.getRectangle( midlPos, startPos ) );
     }
 
-    // sort tiles to be drawn in the rigth order on screen
-    //std::sort( ret.begin(), ret.end(), compare_tiles_ );
     foreach( it, ret )
     {
       if( !(*it)->isWalkable( true ) )
@@ -96,9 +107,15 @@ TilesArray RoadPropagator::createPath(Tilemap& tileMap, TilePos startPos, TilePo
 
   if( ret.empty() )
   {
-    int flags = Pathfinder::fourDirection | Pathfinder::terrainOnly;
+    Pathfinder& finder = Pathfinder::instance();
+    finder.setCondition( makeDelegate( &RoadPropagator::instance(), &RoadPropagator::canBuildRoad ) );
+
+    int flags = Pathfinder::fourDirection | Pathfinder::terrainOnly | Pathfinder::customCondition;
+
     flags |= (roadAssignment ? 0 : Pathfinder::ignoreRoad );
-    Pathway way = Pathfinder::instance().getPath( startPos, stopPos, flags );
+    const Tile& stile = tileMap.at( startPos );
+    const Tile& ftile = tileMap.at( stopPos );
+    Pathway way = finder.getPath( stile.pos(), ftile.pos(), flags );
 
     ret = way.allTiles();
   }

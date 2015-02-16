@@ -15,16 +15,20 @@
 //
 // Copyright 2012-2014 Dalerank, dalerankn8@gmail.com
 
+#ifdef _MSC_VER
+#include <cmath>
+#endif
+
 #include "widget.hpp"
 #include "widgetprivate.hpp"
 #include "environment.hpp"
 #include "core/event.hpp"
+#include "core/variant_map.hpp"
 #include "core/foreach.hpp"
 #include "core/saveadapter.hpp"
-#include "core/stringhelper.hpp"
+#include "core/utils.hpp"
 #include "core/logger.hpp"
 #include "core/gettext.hpp"
-
 
 namespace gui
 {
@@ -132,7 +136,7 @@ void Widget::setGeometry( const Rect& r, GeometryType mode )
 
 void Widget::_resizeEvent(){}
 
-Widget::Widgets& Widget::Widget::_getChildren() {  return _dfunc()->children;}
+Widget::Widgets& Widget::_getChildren() {  return _dfunc()->children;}
 
 void Widget::setPosition( const Point& position )
 {
@@ -515,7 +519,7 @@ void Widget::setParent(Widget* p) {  _dfunc()->parent = p; }
 
 static int __convStr2RelPos( Widget* w, std::string s )
 {
-  s = StringHelper::trim( s );
+  s = utils::trim( s );
   std::string dd = s.substr( 0, 2 );
   int lenght = 0;
   if( dd == "pw" ) { lenght = w->parent()->width(); }
@@ -524,11 +528,27 @@ static int __convStr2RelPos( Widget* w, std::string s )
 
   if( !dd.empty() )
   {
-    int sign = s.substr( 2, 1 ) == "-" ? -1 : 1;
-    int value = StringHelper::toInt( s.substr( 3 ) );
-    return lenght + sign * value;
+    std::string opStr = s.substr( 2, 1 );
+    char operation = opStr.empty() ? 0 : opStr[ 0 ];
+    int value = utils::toFloat( s.substr( 3 ) );
+    switch( operation )
+    {
+    case '-':
+    case '+':
+      return lenght + (operation == '-' ? -1 : 1) * value;
+    break;
+
+    case '/': return lenght/value; break;
+    case '*': return lenght*value; break;
+    }
+
+    Logger::warning( "Widget::__convStr2RelPos unknown operation " + s );
+    return 20;
   }
-  else { return StringHelper::toInt( s );  }
+  else
+  {
+    return utils::toInt( s );
+  }
 }
 
 void Widget::setupUI( const VariantMap& options )
@@ -632,7 +652,7 @@ void Widget::setupUI( const VariantMap& options )
 void Widget::setupUI(const vfs::Path& filename)
 {
   Logger::warning( "Widget: load gui model from " + filename.toString() );
-  setupUI( SaveAdapter::load( filename ) );
+  setupUI( config::load( filename ) );
 }
 
 void Widget::_addChild( Widget* child )
@@ -751,7 +771,7 @@ void Widget::_recalculateAbsolutePosition( bool recursive )
         {
             (*it)->_recalculateAbsolutePosition(recursive);
         }
-    }
+      }
 }
 
 void Widget::animate( unsigned int timeMs )
@@ -771,8 +791,7 @@ void Widget::remove()
 
 bool Widget::onEvent( const NEvent& event )
 {
-  __D_IMPL(_d,Widget)
-  foreach( item, _d->eventHandlers )
+  foreach( item, _dfunc()->eventHandlers )
   {
     bool handled = (*item)->onEvent( event );
     if( handled )
@@ -788,16 +807,17 @@ bool Widget::onEvent( const NEvent& event )
 
 bool Widget::isMyChild( Widget* child ) const
 {
-    if (!child)
-        return false;
-    do
-    {
-        if( child->parent() )
-            child = child->parent();
+  if (!child)
+    return false;
 
-    } while (child->parent() && child != this);
+  do
+  {
+    if( child->parent() )
+     child = child->parent();
 
-	return child == this;
+  } while (child->parent() && child != this);
+
+  return child == this;
 }
 
 void Widget::setWidth( unsigned int width )

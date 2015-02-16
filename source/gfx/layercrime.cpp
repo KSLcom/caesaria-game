@@ -32,7 +32,8 @@ using namespace constants;
 namespace gfx
 {
 
-namespace {
+namespace layer
+{
 
 static const std::string crimeDesc[] =
 {
@@ -48,11 +49,9 @@ static const std::string crimeDesc[] =
   "##high_crime_risk##"
 };
 
-}
+int Crime::type() const {  return citylayer::crime; }
 
-int LayerCrime::type() const {  return citylayer::crime; }
-
-void LayerCrime::drawTile( Engine& engine, Tile& tile, const Point& offset)
+void Crime::drawTile( Engine& engine, Tile& tile, const Point& offset)
 {
   Point screenPos = tile.mappos() + offset;
 
@@ -66,46 +65,24 @@ void LayerCrime::drawTile( Engine& engine, Tile& tile, const Point& offset)
     bool needDrawAnimations = false;
     TileOverlayPtr overlay = tile.overlay();
     int crime = -1;
-    switch( overlay->type() )
+
+    if( _isVisibleObject( overlay->type() ) )
     {
-    //fire buildings and roads
-    case construction::road:
-    case construction::plaza:
-    case construction::garden:
-
-    case building::burnedRuins:
-    case building::collapsedRuins:
-
-    case building::lowBridge:
-    case building::highBridge:
-
-    case building::elevation:
-    case building::rift:
-
-    case building::prefecture:
-    case building::burningRuins:
       needDrawAnimations = true;
-    break;
+    }
+    else if( overlay->type() == objects::house )
+    {
+      HousePtr house = ptr_cast<House>( overlay );
+      crime = (int)house->getServiceValue( Service::crime );
+      needDrawAnimations = (house->spec().level() == 1) && house->habitants().empty(); // In case of vacant terrain
 
-      //houses
-    case building::house:
-      {
-        HousePtr house = ptr_cast<House>( overlay );
-        crime = (int)house->getServiceValue( Service::crime );
-        needDrawAnimations = (house->spec().level() == 1) && house->habitants().empty(); // In case of vacant terrain
-
-        city::Helper helper( _city() );
-        drawArea( engine, helper.getArea( overlay ), offset, ResourceGroup::foodOverlay, OverlayPic::inHouseBase  );
-      }
-    break;
-
-      //other buildings
-    default:
-      {
-        city::Helper helper( _city() );
-        drawArea( engine, helper.getArea( overlay ), offset, ResourceGroup::foodOverlay, OverlayPic::base  );
-      }
-    break;
+      city::Helper helper( _city() );
+      drawArea( engine, helper.getArea( overlay ), offset, ResourceGroup::foodOverlay, OverlayPic::inHouseBase  );
+    }
+    else
+    {
+      city::Helper helper( _city() );
+      drawArea( engine, helper.getArea( overlay ), offset, ResourceGroup::foodOverlay, OverlayPic::base  );
     }
 
     if( needDrawAnimations )
@@ -115,22 +92,22 @@ void LayerCrime::drawTile( Engine& engine, Tile& tile, const Point& offset)
     }
     else if( crime >= 0)
     {
-      drawColumn( engine, screenPos, crime);
+      _addColumn( screenPos, crime );
     }
   }
 
   tile.setWasDrawn();
 }
 
-LayerPtr LayerCrime::create(Camera& camera, PlayerCityPtr city)
+LayerPtr Crime::create(Camera& camera, PlayerCityPtr city)
 {
-  LayerPtr ret( new LayerCrime( camera, city ) );
+  LayerPtr ret( new Crime( camera, city ) );
   ret->drop();
 
   return ret;
 }
 
-void LayerCrime::handleEvent(NEvent& event)
+void Crime::handleEvent(NEvent& event)
 {
   if( event.EventType == sEventMouse )
   {
@@ -163,11 +140,13 @@ void LayerCrime::handleEvent(NEvent& event)
   Layer::handleEvent( event );
 }
 
-LayerCrime::LayerCrime( Camera& camera, PlayerCityPtr city)
-  : Layer( &camera, city )
+Crime::Crime( Camera& camera, PlayerCityPtr city)
+  : Info( camera, city, 18 )
 {
-  _loadColumnPicture( 18 );
   _addWalkerType( walker::prefect );
+  _fillVisibleObjects( type() );
 }
+
+}//end namespace layer
 
 }//end namespace gfx

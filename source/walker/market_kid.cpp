@@ -22,17 +22,21 @@
 #include "pathway/pathway.hpp"
 #include "good/goodstore.hpp"
 #include "game/resourcegroup.hpp"
+#include "core/variant_map.hpp"
 #include "name_generator.hpp"
 #include "constants.hpp"
 #include "corpse.hpp"
 #include "thinks.hpp"
+#include "walkers_factory.hpp"
 
 using namespace constants;
+
+REGISTER_CLASS_IN_WALKERFACTORY(walker::marketKid, MarketKid)
 
 class MarketKid::Impl
 {
 public:
-  GoodStock basket;
+  good::Stock basket;
   TilePos marketPos;
   unsigned int delay;
   unsigned int birthTime;
@@ -58,7 +62,7 @@ MarketKidPtr MarketKid::create(PlayerCityPtr city, MarketBuyerPtr lady )
 }
 
 MarketKid::MarketKid(PlayerCityPtr city )
-  : Walker( city ), _d( new Impl )
+  : Human( city ), _d( new Impl )
 {
   _d->delay = 0;
   _d->birthTime = 0;
@@ -124,8 +128,8 @@ void MarketKid::_reachedPathway()
 
   deleteLater();
 
-  city::Helper cityh( _city() );
-  MarketPtr market = cityh.find<Market>( building::market, _d->marketPos );
+  MarketPtr market;
+  market << _city()->getOverlay( _d->marketPos );
   if( market.isValid() )
   {
     market->goodStore().store( _d->basket, _d->basket.qty() );
@@ -145,7 +149,7 @@ bool MarketKid::die()
   return created;
 }
 
-void MarketKid::_updateThinks()
+void MarketKid::_updateThoughts()
 {
   StringArray ownThinks;
   ownThinks << "##market_kid_say_1##";
@@ -155,4 +159,4 @@ void MarketKid::_updateThinks()
   setThinks( WalkerThinks::check( this, _city(), ownThinks ) );
 }
 
-GoodStock& MarketKid::getBasket(){  return _d->basket;}
+good::Stock& MarketKid::getBasket(){  return _d->basket;}

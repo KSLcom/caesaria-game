@@ -16,7 +16,6 @@
 // Copyright 2012-2013 Gregoire Athanase, gathanase@gmail.com
 // Copyright 2012-2014 dalerank, dalerankn8@gmail.com
 
-
 #ifndef __CAESARIA_APPLICATION_H_INCLUDED__
 #define __CAESARIA_APPLICATION_H_INCLUDED__
 
@@ -25,6 +24,8 @@
 #include "core/signals.hpp"
 #include "scene/base.hpp"
 #include "gfx/engine.hpp"
+#include "scene/constants.hpp"
+#include "enums.hpp"
 
 class Scene;
 
@@ -35,17 +36,14 @@ public:
   ~Game();
 
   void save(std::string filename) const;
-  void load(std::string filename);
+  bool load(std::string filename);
 
   void initialize();
 
-  void exec();
+  bool exec();
 
   void reset();
-
-  void setScreenMenu();
-  void setScreenGame();
-  void setScreenBriefing();
+  void clear();
 
   PlayerPtr player() const;
   PlayerCityPtr city() const;
@@ -53,6 +51,7 @@ public:
   gui::Ui* gui() const;
   gfx::Engine* engine() const;
   scene::Base* scene() const;
+  DateTime date() const;
 
   void setPaused( bool value );
   bool isPaused() const;
@@ -65,11 +64,13 @@ public:
   void changeTimeMultiplier(int percent);
   void setTimeMultiplier(int percent);
   int timeMultiplier() const;
+  void setNextScreen( scene::ScreenType screen);
 
-public oc3_signals:
+public signals:
   Signal1<std::string>& onSaveAccepted();
 
 private:
+
   class Impl;
   ScopedPtr< Impl > _d;
 };

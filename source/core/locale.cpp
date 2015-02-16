@@ -18,11 +18,18 @@
 #include "locale.hpp"
 #include "bytearray.hpp"
 #include "logger.hpp"
-#include "stringhelper.hpp"
+#include "utils.hpp"
+#include "variant_map.hpp"
 #include "saveadapter.hpp"
 
 namespace {
-  typedef std::map< int, std::string > Translator;
+  struct tr
+  {
+    std::string def_text;
+    std::string text;
+  };
+  
+  typedef std::map< int, tr > Translator;
   Translator translator;
   vfs::Directory directory;
   std::string currentLanguage;
@@ -30,16 +37,26 @@ namespace {
 
 static void __loadTranslator( vfs::Path filename )
 {  
-  VariantMap trs = SaveAdapter::load( directory/filename );
+  VariantMap trs = config::load( directory/filename );
   Logger::warning( "Locale: load translation from " + (directory/filename).toString() );
 
   foreach( it, trs )
   {
-    int hash = StringHelper::hash( it->first );
-    Translator::iterator trIt = translator.find( hash );
-    Logger::warningIf( trIt != translator.end(), "Locale: also have translation for " + it->first );
+    int hash = utils::hash( it->first );
+    translator[ hash ].text = it->second.toString();
+  }
+}
 
-    translator[ hash ] = it->second.toString();
+static void __loadDefault()
+{
+  vfs::Path filename( "caesar.en" );
+  VariantMap trs = config::load( directory/filename );
+  Logger::warning( "Locale: load default translation from " + (directory/filename).toString() );
+
+  foreach( it, trs )
+  {
+    int hash = utils::hash( it->first );
+    translator[ hash ].def_text = it->second.toString();
   }
 }
 
@@ -48,13 +65,25 @@ static void __loadTranslator( vfs::Path filename )
 void Locale::setDirectory(vfs::Directory dir)
 {
   directory = dir;
+  translator.clear();
+  __loadDefault();
 }
 
 void Locale::setLanguage(std::string language)
 {
-  translator.clear();
   currentLanguage = language;
+
+  foreach( it, translator )
+  {
+    it->second.text.clear();
+  }
+
   addTranslation( "caesar" );
+}
+
+std::string Locale::current()
+{
+  return currentLanguage;
 }
 
 void Locale::addTranslation(std::string filename)
@@ -65,10 +94,17 @@ void Locale::addTranslation(std::string filename)
 
 const char* Locale::translate( const std::string& text)
 {
-  int hash = StringHelper::hash( text );
+  int hash = utils::hash( text );
   Translator::iterator it = translator.find( hash );
 
-  return ( it != translator.end()
-                 ? (it->second.empty() ? text.c_str() : it->second.c_str())
-                 : text.c_str() );
+  if( it == translator.end() )
+  {
+    return text.c_str();
+  }
+  else
+  {
+    const tr& item = it->second;
+    const std::string& ret = item.text.empty() ? item.def_text : item.text;
+    return ( ret.empty() ? text : ret ).c_str();
+  }
 }

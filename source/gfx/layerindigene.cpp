@@ -29,12 +29,15 @@ using namespace constants;
 namespace gfx
 {
 
-int LayerIndigene::type() const
+namespace layer
+{
+
+int Indigene::type() const
 {
   return citylayer::aborigen;
 }
 
-void LayerIndigene::drawTile(Engine& engine, Tile& tile, const Point& offset)
+void Indigene::drawTile(Engine& engine, Tile& tile, const Point& offset)
 {
   Point screenPos = tile.mappos() + offset;
 
@@ -48,46 +51,23 @@ void LayerIndigene::drawTile(Engine& engine, Tile& tile, const Point& offset)
     bool needDrawAnimations = false;
     TileOverlayPtr overlay = tile.overlay();
     int discontentLevel = 0;
-    switch( overlay->type() )
+    if( _isVisibleObject( overlay->type() ) )
     {
-      //fire buildings and roads
-    case construction::road:
-    case construction::plaza:
-    case construction::garden:
-
-    case building::burnedRuins:
-    case building::collapsedRuins:
-
-    case building::lowBridge:
-    case building::highBridge:
-
-    case building::elevation:
-    case building::rift:
-
-    case building::nativeCenter:
-    case building::nativeField:
       needDrawAnimations = true;
-    break;
+    }
+    else if( overlay->type() == objects::native_hut )
+    {
+      NativeHutPtr hut = ptr_cast<NativeHut>( overlay );
+      discontentLevel = (int)hut->discontent();
+      needDrawAnimations = false;
 
-      //houses
-    case building::nativeHut:
-      {
-        NativeHutPtr hut = ptr_cast<NativeHut>( overlay );
-        discontentLevel = (int)hut->discontent();
-        needDrawAnimations = false;
-
-        city::Helper helper( _city() );
-        drawArea( engine, helper.getArea( overlay ), offset, ResourceGroup::foodOverlay, OverlayPic::inHouseBase );
-      }
-    break;
-
-      //other buildings
-    default:
-      {
-        city::Helper helper( _city() );
-        drawArea( engine, helper.getArea( overlay ), offset, ResourceGroup::foodOverlay, OverlayPic::base );
-      }
-    break;
+      city::Helper helper( _city() );
+      drawArea( engine, helper.getArea( overlay ), offset, ResourceGroup::foodOverlay, OverlayPic::inHouseBase );
+    }
+    else
+    {
+      city::Helper helper( _city() );
+      drawArea( engine, helper.getArea( overlay ), offset, ResourceGroup::foodOverlay, OverlayPic::base );
     }
 
     if( needDrawAnimations )
@@ -97,22 +77,22 @@ void LayerIndigene::drawTile(Engine& engine, Tile& tile, const Point& offset)
     }
     else if( discontentLevel >= 0 )
     {
-      drawColumn( engine, screenPos, discontentLevel );
+      _addColumn( screenPos, discontentLevel );
     }
   }
 
   tile.setWasDrawn();
 }
 
-LayerPtr LayerIndigene::create( Camera& camera, PlayerCityPtr city)
+LayerPtr Indigene::create( Camera& camera, PlayerCityPtr city)
 {
-  LayerPtr ret( new LayerIndigene( camera, city ) );
+  LayerPtr ret( new Indigene( camera, city ) );
   ret->drop();
 
   return ret;
 }
 
-void LayerIndigene::handleEvent(NEvent& event)
+void Indigene::handleEvent(NEvent& event)
 {
   if( event.EventType == sEventMouse )
   {
@@ -137,13 +117,13 @@ void LayerIndigene::handleEvent(NEvent& event)
   Layer::handleEvent( event );
 }
 
-LayerIndigene::LayerIndigene( Camera& camera, PlayerCityPtr city)
-  : Layer( &camera, city )
+Indigene::Indigene( Camera& camera, PlayerCityPtr city)
+  : Info( camera, city, 15 )
 {
-  _loadColumnPicture( 15 );
+  _visibleWalkers() << walker::indigene << walker::missioner;
+  _fillVisibleObjects( citylayer::aborigen );
+}
 
-  _addWalkerType( walker::indigene );
-  _addWalkerType( walker::missioner );
 }
 
 }//end namespace gfx

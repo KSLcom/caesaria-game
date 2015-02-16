@@ -19,8 +19,9 @@
 #include "listboxprivate.hpp"
 #include "pushbutton.hpp"
 #include "core/time.hpp"
-#include "core/stringhelper.hpp"
+#include "core/utils.hpp"
 #include "core/event.hpp"
+#include "core/variant_map.hpp"
 #include "gfx/engine.hpp"
 #include "gfx/decorator.hpp"
 #include "core/foreach.hpp"
@@ -205,21 +206,21 @@ void ListBox::_indexChanged( unsigned int eventType )
   {
   case guiListboxChanged:
   {
-    oc3_emit _d->indexSelected( _d->selectedItemIndex );
+    emit _d->indexSelected( _d->selectedItemIndex );
     if( _d->selectedItemIndex >= 0 )
     {
-      oc3_emit _d->textSelected( _d->items[ _d->selectedItemIndex ].text() );
-      oc3_emit _d->onItemSelectedSignal( _d->items[ _d->selectedItemIndex ] );
+      emit _d->textSelected( _d->items[ _d->selectedItemIndex ].text() );
+      emit _d->onItemSelectedSignal( _d->items[ _d->selectedItemIndex ] );
     }
   }
   break;
 
   case guiListboxSelectedAgain:
   {
-    oc3_emit _d->indexSelectedAgain( _d->selectedItemIndex );
+    emit _d->indexSelectedAgain( _d->selectedItemIndex );
     if( _d->selectedItemIndex >= 0 )
     {
-      oc3_emit _d->onItemSelectedAgainSignal( _d->items[ _d->selectedItemIndex ].text() );
+      emit _d->onItemSelectedAgainSignal( _d->items[ _d->selectedItemIndex ].text() );
     }
   }
   break;
@@ -314,8 +315,8 @@ bool ListBox::onEvent(const NEvent& event)
         if (_d->selectedItemIndex > -1 && _d->keyBuffer.size() > 1)
 				{
 					if( _d->items[ _d->selectedItemIndex ].text().size() >= _d->keyBuffer.size()
-							&& StringHelper::isEquale( _d->keyBuffer, _d->items[_d->selectedItemIndex].text().substr( 0,_d->keyBuffer.size() ),
-																				StringHelper::equaleIgnoreCase ) )
+							&& utils::isEquale( _d->keyBuffer, _d->items[_d->selectedItemIndex].text().substr( 0,_d->keyBuffer.size() ),
+																				utils::equaleIgnoreCase ) )
 					{
 						return true;
 					}
@@ -326,8 +327,8 @@ bool ListBox::onEvent(const NEvent& event)
 				{
 					if( _d->items[current].text().size() >= _d->keyBuffer.size())
 					{
-						if( StringHelper::isEquale( _d->keyBuffer, _d->items[current].text().substr(0,_d->keyBuffer.size()),
-                                        StringHelper::equaleIgnoreCase ) )
+						if( utils::isEquale( _d->keyBuffer, _d->items[current].text().substr(0,_d->keyBuffer.size()),
+                                        utils::equaleIgnoreCase ) )
 						{
 							if ( _d->selectedItemIndex != current && !_d->selecting && !isFlag( moveOverSelect ))
 							{
@@ -344,8 +345,8 @@ bool ListBox::onEvent(const NEvent& event)
 				{
 					if( _d->items[current].text().size() >= _d->keyBuffer.size())
 					{
-						if( StringHelper::isEquale( _d->keyBuffer, _d->items[current].text().substr( 0,_d->keyBuffer.size() ),
-																				StringHelper::equaleIgnoreCase ) )
+						if( utils::isEquale( _d->keyBuffer, _d->items[current].text().substr( 0,_d->keyBuffer.size() ),
+																				utils::equaleIgnoreCase ) )
 						{
 							if ( _d->selectedItemIndex != current && !_d->selecting && !isFlag( moveOverSelect ))
 							{
@@ -617,6 +618,8 @@ void ListBox::beforeDraw(gfx::Engine& painter)
   Widget::beforeDraw( painter );
 }
 
+void ListBox::refresh() {  _d->needItemsRepackTextures = true; }
+
 //! draws the element and its children
 void ListBox::draw(gfx::Engine& painter )
 {
@@ -660,13 +663,14 @@ void ListBox::draw(gfx::Engine& painter )
         _drawItemText( painter, refItem, widgetLeftup + frameRect.lefttop() + scrollBarOffset, &clipRect  );
       }
 
-      if( !refItem.url().empty() )
+     /* if( !refItem.url().empty() )
       {
         Point r = frameRect.rightbottom();
-        r += Point( 0, -_d->scrollBar->value() ) + refItem.textOffset();
+        r += Point( 0, -_d->scrollBar->value() );
         //_d->background->fill( currentFont.color(), textRect + Point( 0, -_d->scrollBar->position() ) + refItem.offset() );
-        painter.drawLine( 0xff00ff00, r - Point( frameRect.width(), 0 ), r );
-      }
+        Point offset = localToScreen( lefttop() );
+        painter.drawLine( 0xff00ff00, r - Point( frameRect.width(), 0 ) + offset, r + offset );
+      } */
     }
 
     frameRect += Point( 0, _d->itemHeight );
@@ -861,8 +865,7 @@ void ListBox::fitText(const std::string& text)
 
 void ListBox::addItems(const StringArray& strings)
 {
-  for( StringArray::const_iterator it=strings.begin(); it != strings.end(); ++it )
-  { addItem( *it ); }
+  foreach( it, strings ) { addItem( *it ); }
 }
 
 Font ListBox::font() const{  return _d->font;}

@@ -50,7 +50,7 @@ public:
   Creators creators;
 };
 
-SrvcPtr ServiceFactory::create( const std::string& name, PlayerCityPtr city )
+SrvcPtr ServiceFactory::create( PlayerCityPtr city, const std::string& name )
 {
   std::string::size_type sharpPos = name.find( "#" );
   std::string srvcType = sharpPos != std::string::npos ? name.substr( sharpPos+1 ) : name;

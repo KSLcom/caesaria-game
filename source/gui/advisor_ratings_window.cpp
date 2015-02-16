@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU General Public License
 // along with CaesarIA.  If not, see <http://www.gnu.org/licenses/>.
 //
-// Copyright 2012-2014 Dalerank, dalerankn8@gmail.com
+// Copyright 2012-2015 Dalerank, dalerankn8@gmail.com
 
 #include "advisor_ratings_window.hpp"
 #include "gfx/picture.hpp"
@@ -22,7 +22,7 @@
 #include "pushbutton.hpp"
 #include "label.hpp"
 #include "game/resourcegroup.hpp"
-#include "core/stringhelper.hpp"
+#include "core/utils.hpp"
 #include "gfx/engine.hpp"
 #include "core/font.hpp"
 #include "objects/construction.hpp"
@@ -36,6 +36,8 @@
 #include "widget_helper.hpp"
 #include "world/emperor.hpp"
 #include "city/funds.hpp"
+#include "dictionary.hpp"
+#include "city/cityservice_peace.hpp"
 #include "city/cityservice_military.hpp"
 #include "city/requestdispatcher.hpp"
 #include "city/cityservice_info.hpp"
@@ -69,10 +71,10 @@ public:
     PictureRef& pic = _textPictureRef();
     if( pic )
     {
-      digitFont.draw( *pic, StringHelper::format( 0xff, "%d", _value ), width() / 2 - 10, 17, true, false );
+      digitFont.draw( *pic, utils::format( 0xff, "%d", _value ), width() / 2 - 10, 17, true, false );
 
       Font targetFont = Font::create( FONT_1 );
-      targetFont.draw( *pic, StringHelper::format( 0xff, "%d %s", _target, _("##wndrt_need##") ), 10, height() - 20, true, false );
+      targetFont.draw( *pic, utils::format( 0xff, "%d %s", _target, _("##wndrt_need##") ), 10, height() - 20, true, false );
 
       pic->update();
     }     
@@ -155,15 +157,12 @@ void Ratings::Impl::checkCultureRating()
       int coverage = culture->coverage( CultureRating::Coverage(k) );
       if( coverage < 100 )
       {
-        std::string troubleDesc = StringHelper::format( 0xff, "##have_less_%s_in_city_%d##", covTypename[ k ], coverage / 50 );
+        std::string troubleDesc = utils::format( 0xff, "##have_less_%s_in_city_%d##", covTypename[ k ], coverage / 50 );
         troubles.push_back( troubleDesc );
       }
     }
 
-    if( !troubles.empty() )
-    {
-      lbRatingInfo->setText( _( troubles.random() ) );
-    }
+    lbRatingInfo->setText( _( troubles.random() ) );
   }
 }
 
@@ -229,22 +228,38 @@ void Ratings::Impl::checkPeaceRating()
   {
     unsigned int peace = city->peace();
 
-    if( ml->monthFromLastAttack() < 36 )
+    bool cityUnderRomeAttack = ml->haveNotification( city::Military::Notification::chastener );
+    bool cityUnderBarbarianAttack = ml->haveNotification( city::Military::Notification::barbarian );
+
+    if( cityUnderBarbarianAttack || cityUnderRomeAttack )
     {
-      advices << "##province_has_peace_a_short_time##";
+      if( cityUnderRomeAttack ) { advices << "##city_under_rome_attack##"; }
+      if( cityUnderBarbarianAttack ) { advices << "##city_under_barbarian_attack##"; }
     }
+    else
+    {
+      if( ml->monthFromLastAttack() < 36 )
+      {
+        advices << "##province_has_peace_a_short_time##";
+      }
 
-    if( peace > 90 ) { advices << "##your_province_quiet_and_secure##"; }
-    else if(peace > 80 ) { advices << "##overall_city_become_a_sleepy_province##"; }
-    else if(peace > 70 ) { advices << "##its_very_peacefull_province##"; }
-    else if( peace > 50 ) { advices << "##this_lawab_province_become_very_peacefull##"; }
-
-    std::string text = advices.empty()
-                        ? "##peace_rating_text##"
-                        : advices.random();
-
-    lbRatingInfo->setText( _(text) );
+      if( peace > 90 ) { advices << "##your_province_quiet_and_secure##"; }
+      else if( peace > 80 ) { advices << "##overall_city_become_a_sleepy_province##"; }
+      else if( peace > 70 ) { advices << "##its_very_peacefull_province##"; }
+      else if( peace > 60 ) { advices << "##this_province_feels_peaceful##"; }
+      else if( peace > 50 ) { advices << "##this_lawab_province_become_very_peacefull##"; }
+    }
   }
+
+  city::PeacePtr peaceRt;
+  peaceRt << city->findService( city::Peace::defaultName() );
+  if( peaceRt.isValid() )
+  {
+    advices << peaceRt->reason();
+  }
+
+  if( advices.empty() ) { advices << "##peace_rating_text##"; }
+  lbRatingInfo->setText( _(advices.random()) );
 }
 
 void Ratings::Impl::checkFavourRating()
@@ -292,11 +307,9 @@ void Ratings::Impl::checkFavourRating()
     }
   }
 
-  std::string text = problems.empty()
-                      ? _("##no_favour_problem##")
-                      : problems.random();
+  if( problems.empty() ) { problems << "##no_favour_problem##"; }
 
-  lbRatingInfo->setText( _(text) );
+  lbRatingInfo->setText( _(problems.random()) );
 }
 
 Ratings::Ratings(Widget* parent, int id, const PlayerCityPtr city )
@@ -306,39 +319,39 @@ Ratings::Ratings(Widget* parent, int id, const PlayerCityPtr city )
   setupUI( ":/gui/ratingsadv.gui" );
   setPosition( Point( (parent->width() - 640 )/2, parent->height() / 2 - 242 ) );
 
-  Label* lbNeedPopulation;
-  GET_WIDGET_FROM_UI( lbNeedPopulation )
+  INIT_WIDGET_FROM_UI( Label*, lbNeedPopulation )
   GET_DWIDGET_FROM_UI( _d, lbRatingInfo )
 
   const city::VictoryConditions& targets = city->victoryConditions();
 
-  if( lbNeedPopulation ) lbNeedPopulation->setText( StringHelper::format( 0xff, "(%s %d)", _("##need_population##"), targets.needPopulation() ) );
+  if( lbNeedPopulation ) lbNeedPopulation->setText( utils::format( 0xff, "(%s %d)", _("##need_population##"), targets.needPopulation() ) );
 
   _d->btnCulture    = new RatingButton( this, Point( 80,  290), "##wndrt_culture##", "##wndrt_culture_tooltip##" );
   _d->btnCulture->setTarget( targets.needCulture() );
   _d->btnCulture->setValue( _d->city->culture() );
-  _d->updateColumn( _d->btnCulture->relativeRect().getCenter(), 0 );
+  _d->updateColumn( _d->btnCulture->relativeRect().center(), _d->city->culture() );
   CONNECT( _d->btnCulture, onClicked(), _d.data(), Impl::checkCultureRating );
 
   _d->btnProsperity = new RatingButton( this, Point( 200, 290), "##wndrt_prosperity##", "##wndrt_prosperity_tooltip##" );
   _d->btnProsperity->setValue( _d->city->prosperity() );
   _d->btnProsperity->setTarget( targets.needProsperity() );
-  _d->updateColumn( _d->btnProsperity->relativeRect().getCenter(), _d->city->prosperity() );
+  _d->updateColumn( _d->btnProsperity->relativeRect().center(), _d->city->prosperity() );
   CONNECT( _d->btnProsperity, onClicked(), _d.data(), Impl::checkProsperityRating );
 
   _d->btnPeace      = new RatingButton( this, Point( 320, 290), "##wndrt_peace##", "##wndrt_peace_tooltip##" );
   _d->btnPeace->setValue( _d->city->peace() );
   _d->btnPeace->setTarget( targets.needPeace() );
-  _d->updateColumn( _d->btnPeace->relativeRect().getCenter(), 0 );
+  _d->updateColumn( _d->btnPeace->relativeRect().center(), _d->city->peace() );
   CONNECT( _d->btnPeace, onClicked(), _d.data(), Impl::checkPeaceRating );
 
   _d->btnFavour     = new RatingButton( this, Point( 440, 290), "##wndrt_favour##", "##wndrt_favour_tooltip##" );
   _d->btnFavour->setValue( _d->city->favour() );
   _d->btnFavour->setTarget( targets.needFavour() );
-  _d->updateColumn( _d->btnFavour->relativeRect().getCenter(), 0 );
+  _d->updateColumn( _d->btnFavour->relativeRect().center(), _d->city->favour() );
   CONNECT( _d->btnFavour, onClicked(), _d.data(), Impl::checkFavourRating );
 
   _d->btnHelp = new TexturedButton( this, Point( 12, height() - 39), Size( 24 ), -1, ResourceMenu::helpInfBtnPicId );
+  CONNECT( _d->btnHelp, onClicked(), this, Ratings::_showHelp );
 }
 
 void Ratings::draw( gfx::Engine& painter )
@@ -350,6 +363,8 @@ void Ratings::draw( gfx::Engine& painter )
 
   painter.draw( _d->columns, absoluteRect().lefttop(), &absoluteClippingRectRef() );
 }
+
+void Ratings::_showHelp() { DictionaryWindow::show( this, "ratings_advisor" ); }
 
 }
 

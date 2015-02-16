@@ -27,11 +27,12 @@
 #include "objects/house_level.hpp"
 #include "game/resourcegroup.hpp"
 #include "core/event.hpp"
+#include "core/variant_map.hpp"
 #include "texturedbutton.hpp"
 #include "gui/label.hpp"
 #include "city/city.hpp"
 #include "objects/market.hpp"
-#include "core/stringhelper.hpp"
+#include "core/utils.hpp"
 #include "good/goodhelper.hpp"
 #include "objects/farm.hpp"
 #include "objects/entertainment.hpp"
@@ -79,7 +80,8 @@ public:
   GameAutoPause autopause;
 
   Impl() : lbBlackFrame(0), lbTitle(0),
-    lbText(0), btnExit(0), btnHelp(0), isAutoPosition(false)
+    lbText(0), btnExit(0), btnHelp(0),
+    isAutoPosition(false)
   {
 
   }
@@ -113,7 +115,7 @@ Simple::Simple( Widget* parent, const Rect& rect, const Rect& blackArea, int id 
   }
 
   CONNECT( _d->btnExit, onClicked(), this, Simple::deleteLater );
-  CONNECT( _d->btnHelp, onClicked(), this, Simple::showDescription );
+  CONNECT( _d->btnHelp, onClicked(), this, Simple::_showHelp );
 
   // black box
   Point lastPos( width() - 32, height() - 48 );
@@ -208,9 +210,9 @@ void Simple::_updateWorkersLabel(const Point &pos, int picId, int need, int have
     return;
 
   // number of workers
-  std::string text = StringHelper::format( 0xff, "%d %s (%d %s)",
-                                           have, _("##employers##"),
-                                           need, _("##requierd##") );
+  std::string text = utils::format( 0xff, "%d %s (%d %s)",
+                                    have, _("##employers##"),
+                                    need, _("##requierd##") );
   _d->lbBlackFrame->setIcon( Picture::load( ResourceGroup::panelBackground, picId ), Point( 20, 10 ) );
   _d->lbBlackFrame->setText( text );
 }

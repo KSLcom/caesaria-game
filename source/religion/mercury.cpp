@@ -21,7 +21,9 @@
 #include "game/gamedate.hpp"
 #include "core/gettext.hpp"
 #include "good/goodstore.hpp"
-#include "core/stringhelper.hpp"
+#include "objects/extension.hpp"
+#include "objects/factory.hpp"
+#include "core/utils.hpp"
 
 using namespace constants;
 using namespace gfx;
@@ -47,28 +49,32 @@ void Mercury::updateRelation(float income, PlayerCityPtr city)
 }
 
 template<class T>
-void __filchGoods( const std::string& title, PlayerCityPtr city )
+void __filchGoods( const std::string& title, PlayerCityPtr city, bool showMessage )
 {
-  std::string txt = StringHelper::format( 0xff, "##%s_of_mercury_title##", title.c_str() );
-  std::string descr = StringHelper::format( 0xff, "##%s_of_mercury_description##", title.c_str() );
-  events::GameEventPtr event = events::ShowInfobox::create( _(txt),
-                                                            _(descr),
-                                                            events::ShowInfobox::send2scribe );
-  event->dispatch();
+  if( showMessage )
+  {
+    std::string txt = utils::format( 0xff, "##%s_of_mercury_title##", title.c_str() );
+    std::string descr = utils::format( 0xff, "##%s_of_mercury_description##", title.c_str() );
 
-  SmartList< Granary> buildings;
+    events::GameEventPtr event = events::ShowInfobox::create( _(txt),
+                                                              _(descr),
+                                                              events::ShowInfobox::send2scribe,
+                                                              ":/smk/God_Mercury.smk");
+    event->dispatch();
+  }
+
+  SmartList<T> buildings;
   buildings << city->overlays();
 
   foreach( it, buildings )
   {
-    GoodStore& store = (*it)->store();
-    for( int i=Good::wheat; i < Good::goodCount; i++ )
+    good::Store& store = (*it)->store();
+    for( good::Product gtype=good::wheat; gtype < good::goodCount; ++gtype )
     {
-      Good::Type gtype = (Good::Type)i;
       int goodQty = math::random( (store.qty( gtype ) + 99) / 100 ) * 100;
       if( goodQty > 0 )
       {
-        GoodStock rmStock( gtype, goodQty );
+        good::Stock rmStock( gtype, goodQty );
         store.retrieve( rmStock, goodQty );
       }
     }
@@ -77,17 +83,34 @@ void __filchGoods( const std::string& title, PlayerCityPtr city )
 
 void Mercury::_doWrath(PlayerCityPtr city)
 {
-  __filchGoods<Warehouse>( "wrath", city );
+  __filchGoods<Warehouse>( "wrath", city, true );
+  __filchGoods<Granary>( "smallcurse", city, false );
 }
 
 void Mercury::_doSmallCurse(PlayerCityPtr city)
 {
-  __filchGoods<Granary>( "smallcurse", city );
+  events::GameEventPtr event = events::ShowInfobox::create( _("##smallcurse_of_mercury_title##"),
+                                                            _("##smallcurse_of_mercury_description##") );
+  event->dispatch();
+
+  FactoryList factories;
+  factories << city->overlays();
+
+  foreach( it, factories )
+  {
+    FactoryProgressUpdater::assignTo( ptr_cast<Factory>( *it ), -5, 4 * 12 );
+  }
 }
 
 void Mercury::_doBlessing(PlayerCityPtr city)
 {
+  WarehouseList whList;
+  whList << city->overlays();
 
+  foreach( it, whList )
+  {
+    WarehouseBuff::assignTo( *it, Warehouse::sellGoodsBuff, 0.2, 4 * 12 );
+  }
 }
 
 }//end namespace rome

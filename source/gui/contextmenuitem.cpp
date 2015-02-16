@@ -41,6 +41,7 @@ ContextMenuItem::ContextMenuItem( ContextMenu* parent, const std::string& text )
 }
 
 Signal1<bool>& ContextMenuItem::onChecked() {  return _d->onCheckedSignal; }
+Signal1<int>&ContextMenuItem::onAction() { return _d->onActionSignal; }
 
 ContextMenu* ContextMenuItem::addSubMenu( int id )
 {
@@ -78,7 +79,7 @@ void ContextMenuItem::toggleCheck()
   if( _d->isAutoChecking )
   {
     _d->checked = !_d->checked;
-    oc3_emit _d->onCheckedSignal( _d->checked );
+    emit _d->onCheckedSignal( _d->checked );
   }
 }
 

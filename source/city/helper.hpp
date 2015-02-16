@@ -26,6 +26,7 @@
 #include "gfx/tilemap.hpp"
 #include "pathway/pathway_helper.hpp"
 #include "core/foreach.hpp"
+#include "walker/walker.hpp"
 #include "objects/service.hpp"
 #include "city/industry.hpp"
 
@@ -47,14 +48,14 @@ public:
   SmartList< T > find( const gfx::TileOverlay::Type type );
 
   template< class T >
-  SmartList< T > find( constants::building::Group group )
+  SmartList< T > find( constants::objects::Group group )
   {
     SmartList< T > ret;
     gfx::TileOverlayList& buildings = _city->overlays();
     foreach( item, buildings )
     {
       SmartPtr< T > b = ptr_cast< T >(*item);
-      if( b.isValid() && (b->group() == group || group == constants::building::anyGroup ) )
+      if( b.isValid() && (b->group() == group || group == constants::objects::anyGroup ) )
       {
         ret.push_back( b );
       }
@@ -68,18 +69,14 @@ public:
   {
     needMeMove = false;
     SmartList<T> walkers;
-    walkers << _city->walkers( constants::walker::all, p );
-    foreach( it, walkers )
+    walkers << _city->walkers( p );
+
+    if( !walkers.empty() )
     {
-      if( *it == caller.object() )
-      {
-        needMeMove = (it != walkers.begin());
-        walkers.erase( it );
-        break;
-      }
+      needMeMove = (caller.object() != walkers.front().object());
     }
 
-    return !walkers.empty();
+    return walkers.empty() > 1;
   }
 
   template<class T>
@@ -95,7 +92,7 @@ public:
       foreach( itile, tiles )
       {
         SmartList<T> eslist;
-        eslist << _city->walkers( constants::walker::any, (*itile)->pos() );
+        eslist << _city->walkers( (*itile)->pos() );
 
         if( !eslist.empty() )
           continue;
@@ -118,7 +115,7 @@ public:
   SmartPtr< T > find( const gfx::TileOverlay::Type type, const TilePos& pos )
   {   
     gfx::TileOverlayPtr overlay = _city->getOverlay( pos );
-    if( overlay.isValid() && (overlay->type() == type || type == constants::building::any) )
+    if( overlay.isValid() && (overlay->type() == type || type == constants::objects::any) )
     {
       return ptr_cast< T >( overlay );
     }
@@ -130,23 +127,47 @@ public:
   SmartList< T > find( constants::walker::Type type,
                        TilePos start, TilePos stop=Helper::invalidPos )
   {
-    SmartList< T > ret;
+    WalkerList walkersInArea;
 
-    WalkerList walkers = _city->walkers( type, start, stop );
-    foreach( w, walkers )
+    TilePos invalidPos( -1, -1 );
+    TilePos stopPos = stop;
+
+    if( start == invalidPos )
     {
-      SmartPtr< T > ptr = ptr_cast<T>( *w );
-      if( ptr.isValid() )
+      const WalkerList& all = _city->walkers();
+      walkersInArea.insert( walkersInArea.end(), all.begin(), all.end() );
+    }
+    else if( stopPos == invalidPos )
+    {
+      const WalkerList& wlkOnTile = _city->walkers( start );
+      walkersInArea.insert( walkersInArea.end(), wlkOnTile.begin(), wlkOnTile.end() );
+    }
+    else
+    {
+      gfx::TilesArray area = _city->tilemap().getArea( start, stop );
+      foreach( tile, area)
       {
-        ret.push_back( ptr );
+        const WalkerList& wlkOnTile = _city->walkers( (*tile)->pos() );
+        walkersInArea.insert( walkersInArea.end(), wlkOnTile.begin(), wlkOnTile.end() );
       }
     }
 
-    return ret;
+    SmartList< T > result;
+    foreach( w, walkersInArea )
+    {
+      if( (*w)->type() == type || type == constants::walker::any )
+      {
+        SmartPtr< T > ptr = ptr_cast<T>( *w );
+        if( ptr.isValid() )
+          result.push_back( ptr );
+      }
+    }
+
+    return result;
   }
 
   template< class T >
-  SmartList< T > find( const gfx::TileOverlay::Type type, TilePos start, TilePos stop )
+  SmartList< T > find( const constants::objects::Type type, TilePos start, TilePos stop=TilePos(-1,-1) )
   {
     SmartList< T > ret;
 
@@ -154,7 +175,7 @@ public:
     foreach( tile, area )
     {
       SmartPtr<T> obj = ptr_cast< T >( (*tile)->overlay() );
-      if( obj.isValid() && (obj->type() == type || type == constants::building::any) )
+      if( obj.isValid() && (obj->type() == type || type == constants::objects::any) )
       {
         ret.push_back( obj );
       }
@@ -164,7 +185,7 @@ public:
   }
 
   template< class T >
-  SmartList< T > find( constants::building::Group group, TilePos start, TilePos stop )
+  SmartList< T > find( constants::objects::Group group, TilePos start, TilePos stop )
   {
     SmartList< T > ret;
 
@@ -173,7 +194,7 @@ public:
     foreach( tile, area )
     {
       SmartPtr<T> obj = ptr_cast< T >((*tile)->overlay());
-      if( obj.isValid() && (obj->getClass() == group || group == constants::building::anyGroup) )
+      if( obj.isValid() && (obj->getClass() == group || group == constants::objects::anyGroup) )
       {
         ret.push_back( obj );
       }
@@ -183,7 +204,7 @@ public:
   }
 
   template< class T >
-  SmartList< T > getProducers( const Good::Type goodtype );
+  SmartList< T > getProducers( const good::Product goodtype );
 
   template< class T >
   SmartPtr< T > next( const SmartPtr< T > current );
@@ -214,9 +235,12 @@ SmartPtr<T> Helper::prew(const SmartPtr<T> current)
   {
     if( current == *obj )
     {
+      if (obj == objects.begin()) // MSVC compiler doesn't support sircular lists. Neither standart does.
+      {
+        obj = objects.end();
+      }      
       obj--;
-      if( obj == objects.end() ) { return objects.back(); }
-      else { return *obj; }
+     return *obj;
     }
   }
 
@@ -231,7 +255,7 @@ SmartList< T > Helper::find( const gfx::TileOverlay::Type type )
   foreach( item, buildings )
   {
     SmartPtr< T > b = ptr_cast<T>( *item );
-    if( b.isValid() && (b->type() == type || type == constants::building::any ) )
+    if( b.isValid() && (b->type() == type || type == constants::objects::any ) )
     {
       ret.push_back( b );
     }
@@ -241,7 +265,7 @@ SmartList< T > Helper::find( const gfx::TileOverlay::Type type )
 }
 
 template< class T >
-SmartList<T> Helper::getProducers( const Good::Type goodtype )
+SmartList<T> Helper::getProducers(const good::Product goodtype )
 {
   SmartList< T > ret;
   gfx::TileOverlayList& overlays = _city->overlays();

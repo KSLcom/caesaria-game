@@ -1,3 +1,4 @@
+
 // This file is part of CaesarIA.
 //
 // CaesarIA is free software: you can redistribute it and/or modify
@@ -16,17 +17,20 @@
 #include "low_bridge.hpp"
 #include "gfx/picture.hpp"
 #include "game/resourcegroup.hpp"
-#include "gfx/tile.hpp"
+#include "gfx/helper.hpp"
 #include "city/helper.hpp"
+#include "core/variant_map.hpp"
 #include "gfx/tilemap.hpp"
 #include "events/build.hpp"
+#include "events/clearland.hpp"
 #include "constants.hpp"
 #include "walker/walker.hpp"
-
-#include <vector>
+#include "objects_factory.hpp"
 
 using namespace constants;
 using namespace gfx;
+
+REGISTER_CLASS_IN_OVERLAYFACTORY(objects::low_bridge, LowBridge)
 
 namespace {
   Point spanswOffset = Point( 10, -25 );
@@ -37,7 +41,7 @@ class LowBridgeSubTile : public Construction
 public:
   enum { liftingWest=67, spanWest=68, descentWest=69, liftingNorth=70, spanNorth=71, descentNorth=72 };
   LowBridgeSubTile( const TilePos& pos, int index )
-    : Construction( building::lowBridge, Size( 1 ) )
+    : Construction( objects::low_bridge, Size( 1 ) )
   {
     _info = 0;
     _imgId = 0;
@@ -45,7 +49,7 @@ public:
     _index = index;
     _parent = 0;
     _picture = Picture::load( ResourceGroup::transport, index );
-    _picture.addOffset( TileHelper::tilepos2screen( _pos ) );
+    _picture.addOffset( tile::tilepos2screen( _pos ) );
   }
 
   virtual ~LowBridgeSubTile() {}
@@ -54,11 +58,11 @@ public:
   bool isWalkable() const { return true;  }
   bool isNeedRoadAccess() const { return false; }
 
-  bool build( PlayerCityPtr city, const TilePos& pos )
+  bool build( const CityAreaInfo& info )
   {
-    Construction::build( city, pos );
+    Construction::build( info );
     _fgPicturesRef().clear();
-    _pos = pos;
+    _pos = info.pos;
     _picture = Picture::load( ResourceGroup::transport, _index );
     _picture.addOffset( Point( 10, -12 ) );
     _fgPicturesRef().push_back( _picture );
@@ -66,18 +70,36 @@ public:
     return true;
   }
 
+  virtual void setState(ParameterType name, double value)
+  {
+    if( _parent && name == Construction::destroyable && value )
+    {
+      _parent->hide();
+    }
+  }
+
+  void hide()
+  {
+    _picture = Picture::getInvalid();
+    _fgPicturesRef().clear();
+  }
+
   void initTerrain( Tile& terrain )
   {
     terrain.setFlag( Tile::tlRoad, true );
   }
 
-  bool canDestroy() const  {  return _parent ? _parent->canDestroy() : true;  }
+  bool canDestroy() const
+  {
+    return _parent ? _parent->canDestroy() : true;
+  }
 
   void destroy()
   {
     if( _parent )
     {
       _parent->deleteLater();
+      _parent = 0;
     }
   }
 
@@ -131,32 +153,32 @@ public:
   }
 };
 
-bool LowBridge::canBuild(PlayerCityPtr city, TilePos pos, const TilesArray& ) const
+bool LowBridge::canBuild( const CityAreaInfo& areaInfo ) const
 {
   //bool is_constructible = Construction::canBuild( pos );
 
   TilePos endPos, startPos;
   _d->direction=noneDirection;
 
-  TileOverlayPtr bridge = city->getOverlay( pos );
+  TileOverlayPtr bridge = areaInfo.city->getOverlay( areaInfo.pos );
   if( bridge.isNull() )
   {
     _d->subtiles.clear();
     LowBridge* thisp = const_cast< LowBridge* >( this );
     thisp->_fgPicturesRef().clear();
 
-    _checkParams( city, _d->direction, startPos, endPos, pos );
+    _checkParams( areaInfo.city, _d->direction, startPos, endPos, areaInfo.pos );
 
     if( _d->direction != noneDirection )
     {
-      thisp->_computePictures( city, startPos, endPos, _d->direction );
+      thisp->_computePictures( areaInfo.city, startPos, endPos, _d->direction );
     }
   }
 
   return (_d->direction != noneDirection);
 }
 
-LowBridge::LowBridge() : Construction( constants::building::lowBridge, Size(1) ), _d( new Impl )
+LowBridge::LowBridge() : Construction( constants::objects::low_bridge, Size(1) ), _d( new Impl )
 {
   Picture pic;
   setPicture( pic );
@@ -354,20 +376,20 @@ void LowBridge::_checkParams(PlayerCityPtr city, constants::Direction& direction
   }
 }
 
-bool LowBridge::build(PlayerCityPtr city, const TilePos& pos )
+bool LowBridge::build( const CityAreaInfo& info )
 {
   TilePos endPos, startPos;
   _d->direction=noneDirection;
   setSize( Size(0) );
-  Construction::build( city, pos );
+  Construction::build( info );
 
 
   _d->subtiles.clear();
   _fgPicturesRef().clear();
 
-  Tilemap& tilemap = city->tilemap();
+  Tilemap& tilemap = info.city->tilemap();
 
-  _checkParams( city, _d->direction, startPos, endPos, pos );
+  _checkParams( info.city, _d->direction, startPos, endPos, info.pos );
   int signSum = 1;
 
   if( _d->direction != noneDirection )
@@ -375,25 +397,25 @@ bool LowBridge::build(PlayerCityPtr city, const TilePos& pos )
     switch( _d->direction )
     {
     case northEast:
-      _computePictures( city, endPos, startPos, southWest );
+      _computePictures( info.city, endPos, startPos, southWest );
       std::swap( _d->subtiles.front()->_pos, _d->subtiles.back()->_pos );
       signSum = -1;
     break;
 
     case northWest:
-      _computePictures( city, endPos, startPos, southEast );
+      _computePictures( info.city, endPos, startPos, southEast );
       std::swap( _d->subtiles.front()->_pos, _d->subtiles.back()->_pos );
       std::swap( startPos, endPos );
       signSum = -1;
     break;
 
     case southWest:
-      _computePictures( city, startPos, endPos, _d->direction );
+      _computePictures( info.city, startPos, endPos, _d->direction );
       std::swap( startPos, endPos );
     break;
 
     case southEast:
-      _computePictures( city, startPos, endPos, _d->direction );
+      _computePictures( info.city, startPos, endPos, _d->direction );
     break;
 
     default: break;
@@ -404,14 +426,14 @@ bool LowBridge::build(PlayerCityPtr city, const TilePos& pos )
     foreach( t, tiles )
     {
       LowBridgeSubTilePtr subtile = _d->subtiles[ index ];
-      TilePos buildPos = pos + subtile->_pos * signSum;
+      TilePos buildPos = info.pos + subtile->_pos * signSum;
       Tile& tile = tilemap.at( buildPos );
       subtile->setPicture( tile.picture() );
       subtile->_imgId = tile.originalImgId();
-      subtile->_info = TileHelper::encode( tile );
+      subtile->_info = tile::encode( tile );
       subtile->_parent = this;
 
-      events::GameEventPtr event = events::BuildEvent::create( buildPos, subtile.object() );
+      events::GameEventPtr event = events::BuildAny::create( buildPos, subtile.object() );
       event->dispatch();
       index++;
     }
@@ -433,7 +455,13 @@ bool LowBridge::canDestroy() const
     }
   }
 
-  return true;
+  bool mayDestroy = state( Construction::destroyable );
+  if( !mayDestroy )
+  {
+    _d->error = "##really_destroy_bridge_qst##";
+  }
+
+  return mayDestroy;
 }
 
 void LowBridge::destroy()
@@ -441,26 +469,13 @@ void LowBridge::destroy()
   foreach( it, _d->subtiles )
   {
     (*it)->_parent = 0;
-    events::GameEventPtr event = events::ClearLandEvent::create( (*it)->_pos );
+    events::GameEventPtr event = events::ClearTile::create( (*it)->_pos );
     event->dispatch();
 
-    std::string picName = TileHelper::convId2PicName( (*it)->_imgId );
+    //std::string picName = TileHelper::convId2PicName( (*it)->_imgId );
 
     Tile& mapTile = _city()->tilemap().at( (*it)->_pos );
-    mapTile.setPicture( Picture::load( picName ) );
-    TileHelper::decode( mapTile, (*it)->_info );
-  }
-}
-
-void LowBridge::setState(Construction::ParameterType name, double value)
-{
-  Construction::setState( name, value );
-  if( name == Construction::destroyable )
-  {
-    foreach( it, _d->subtiles )
-    {
-      (*it)->setState( name, value );
-    }
+    tile::decode( mapTile, (*it)->_info );
   }
 }
 
@@ -488,6 +503,15 @@ void LowBridge::load(const VariantMap& stream)
   for( unsigned int i=0; i < vl_tinfo.size(); i++ )
   {
     _d->subtiles[ i ]->_imgId = vl_tinfo.get( i ).toInt();
+  }
+}
+
+void LowBridge::hide()
+{
+  setState( Construction::destroyable, 1);
+  foreach( it, _d->subtiles )
+  {
+    (*it)->hide();
   }
 }
 

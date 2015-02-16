@@ -17,8 +17,8 @@
 
 #include "picture_info_bank.hpp"
 #include "game/resourcegroup.hpp"
-#include "core/stringhelper.hpp"
-#include "core/variant.hpp"
+#include "core/utils.hpp"
+#include "core/variant_map.hpp"
 #include "core/saveadapter.hpp"
 #include "core/logger.hpp"
 #include <map>
@@ -98,12 +98,6 @@ PictureInfoBank::PictureInfoBank() : _d( new Impl )
   _d->setOne(ResourceGroup::commerce, 156, 47, -11);  // iron
   _d->setOne(ResourceGroup::commerce, 157, 47, -9);  // clay
 
-  // warehouse
-  _d->setOne(ResourceGroup::warehouse, 1, 60, 56);
-  _d->setOne(ResourceGroup::warehouse, 18, 56, 93);
-  _d->setRange(ResourceGroup::warehouse, 2, 17, Point( 55, 75 ));
-  _d->setRange(ResourceGroup::warehouse, 84, 91, Point( 79, 108 ) );
-
   // granary
   _d->setOne(ResourceGroup::commerce, 141, 28, 109);
   _d->setOne(ResourceGroup::commerce, 142, 33, 75);
@@ -148,19 +142,19 @@ void PictureInfoBank::Impl::setRange(const std::string& preffix, const int first
 
 void PictureInfoBank::Impl::setOne(const std::string& preffix, const int index, const Point& offset)
 {
-  unsigned int hashName = StringHelper::hash( 0xff, "%s_%05d", preffix.c_str(), index );
+  unsigned int hashName = utils::hash( 0xff, "%s_%05d", preffix.c_str(), index );
   data[hashName] = offset;
 }
 
 void PictureInfoBank::Impl::setOne(const std::string& preffix, const int index, const int xoffset, const int yoffset)
 {
-  unsigned int hashName = StringHelper::hash( 0xff, "%s_%05d", preffix.c_str(), index );
+  unsigned int hashName = utils::hash( 0xff, "%s_%05d", preffix.c_str(), index );
   data[hashName] = Point( xoffset, yoffset );
 }
 
 Point PictureInfoBank::getOffset(const std::string& resource_name)
 {
-  Impl::PictureInfoMap::iterator it = _d->data.find( StringHelper::hash( resource_name ) );
+  Impl::PictureInfoMap::iterator it = _d->data.find( utils::hash( resource_name ) );
   if (it == _d->data.end())
   {
     return Point();
@@ -185,7 +179,7 @@ PictureInfoBank::~PictureInfoBank() {}
 void PictureInfoBank::initialize(vfs::Path filename)
 {
   Logger::warning( "PictureInfoBank: start load offsets from " + filename.toString() );
-  VariantMap m = SaveAdapter::load( filename );
+  VariantMap m = config::load( filename );
 
   foreach( it, m )
   {

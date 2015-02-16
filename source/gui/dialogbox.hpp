@@ -31,6 +31,7 @@ public:
   enum { btnYes=0x1, btnNo=0x2, btnOk=0x4, btnCancel=0x8,
          btnOkCancel=btnOk|btnCancel,
          btnNever=0x10 };
+
   DialogBox( Widget* parent, const Rect& rectangle, const std::string& title, 
              const std::string& text, int buttons );
 
@@ -38,7 +39,14 @@ public:
 
   void draw( gfx::Engine& painter );
 
-oc3_signals public:  
+  static DialogBox* information( Widget* parent,
+                                 const std::string& title,
+                                 const std::string& text );
+  static DialogBox* confirmation( Widget* parent,
+                                  const std::string& title,
+                                  const std::string& text );
+
+signals public:  
   Signal1<int>& onResult();
   Signal0<>& onOk();
   Signal0<>& onCancel();

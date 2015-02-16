@@ -21,6 +21,7 @@
 #include "city/city.hpp"
 #include "core/foreach.hpp"
 #include "dispatcher.hpp"
+#include "core/variant_map.hpp"
 #include "city/requestdispatcher.hpp"
 #include "core/logger.hpp"
 #include "city/cityservice_factory.hpp"
@@ -30,7 +31,7 @@ namespace events
 {
 
 namespace {
- const int checkInterval = 50;
+static const unsigned int defaultCheckInterval = 50;
 }
 
 class PostponeEvent::Impl
@@ -39,6 +40,7 @@ public:
   DateTime date;
   unsigned int population;
   bool mayDelete;
+  unsigned int checkInterval;
   VariantMap options;
 
   void executeRequest( Game& game, const std::string& type, bool& result );
@@ -106,12 +108,12 @@ void PostponeEvent::_exec(Game& game, unsigned int)
 
 bool PostponeEvent::_mayExec( Game& game, unsigned int time ) const
 {
-  if( time % checkInterval == 1 )
+  if( _d->checkInterval == 0 || (time % _d->checkInterval == 1) )
   {
     bool dateCondition = true;
     if( _d->date.year() != -1000 )
     {
-      dateCondition = _d->date <= GameDate::current();
+      dateCondition = _d->date <= game::Date::current();
     }
 
     bool popCondition = true;
@@ -132,9 +134,10 @@ VariantMap PostponeEvent::save() const
 {
   VariantMap ret = _d->options;
   ret[ "type" ] = Variant( _type );
-  ret[ "name" ] = Variant( _name );
+  ret[ "name" ] = Variant( _name );  
   ret[ "date" ] = _d->date;
-  VARIANT_SAVE_ANY_D( ret, _d, population );
+  VARIANT_SAVE_ANY_D( ret, _d, checkInterval)
+  VARIANT_SAVE_ANY_D( ret, _d, population )
   return ret;
 }
 
@@ -143,7 +146,8 @@ void PostponeEvent::load(const VariantMap& stream)
   GameEvent::load( stream );
 
   _d->date = stream.get( "date", DateTime( -1000, 1, 1 ) ).toDateTime();
-  VARIANT_LOAD_ANY_D( _d, population, stream );
+  VARIANT_LOAD_ANY_D( _d, population, stream )
+  VARIANT_LOAD_ANYDEF_D( _d, checkInterval, defaultCheckInterval, stream )
   _d->options = stream;
 }
 
@@ -174,7 +178,7 @@ void PostponeEvent::Impl::executeRequest( Game& game, const std::string& type, b
 
 void PostponeEvent::Impl::executeEvent( Game& game, const std::string& type, bool& r  )
 {
-  GameEventPtr e = GameEventFactory::create( type );
+  GameEventPtr e = EFactory::create( type );
   if( e.isValid() )
   {
     e->load( options );
@@ -190,7 +194,7 @@ void PostponeEvent::Impl::executeCityService( Game& game, const std::string& typ
 {
   PlayerCityPtr city = game.city();
   std::string dtype = options.get( "type", Variant( type ) ).toString();
-  city::SrvcPtr srvc = city::ServiceFactory::create( dtype, city );
+  city::SrvcPtr srvc = city::ServiceFactory::create( game.city(), dtype );
   if( srvc.isValid() )
   {
     srvc->load( options );

@@ -28,13 +28,13 @@ namespace infobox
 class AboutSenate : public Simple
 {
 public:
-  AboutSenate( Widget* parent, const gfx::Tile& tile );
+  AboutSenate( Widget* parent, PlayerCityPtr city, const gfx::Tile& tile );
   virtual ~AboutSenate();
 
-public oc3_signals:
+public signals:
   Signal0<>& onButtonAdvisorClicked();
 
-private oc3_slots:
+private slots:
   void _showRatingAdvisor();
 };
 

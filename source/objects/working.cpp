@@ -19,7 +19,8 @@
 #include "city/helper.hpp"
 #include "walker/walker.hpp"
 #include "events/returnworkers.hpp"
-#include "core/stringhelper.hpp"
+#include "core/utils.hpp"
+#include "core/variant_map.hpp"
 #include "game/gamedate.hpp"
 #include "objects/house.hpp"
 #include "objects/house_level.hpp"
@@ -80,6 +81,13 @@ std::string WorkingBuilding::workersProblemDesc() const
   return WorkingBuildingHelper::productivity2desc( const_cast<WorkingBuilding*>( this ) );
 }
 
+std::string WorkingBuilding::sound() const
+{
+  return (isActive() && numberWorkers() > 0
+            ? Building::sound()
+            : "");
+}
+
 std::string WorkingBuilding::troubleDesc() const
 {
   std::string trouble = Building::troubleDesc();
@@ -104,6 +112,13 @@ std::string WorkingBuilding::troubleDesc() const
   return trouble;
 }
 
+void WorkingBuilding::initialize(const MetaData& mdata)
+{
+  Building::initialize( mdata );
+
+  setMaximumWorkers( (unsigned int)mdata.getOption( "employers" ) );
+}
+
 std::string WorkingBuilding::workersStateDesc() const { return ""; }
 void WorkingBuilding::setMaximumWorkers(const unsigned int maxWorkers) { _d->maxWorkers = maxWorkers; }
 unsigned int WorkingBuilding::maximumWorkers() const { return _d->maxWorkers; }
@@ -112,7 +127,7 @@ unsigned int WorkingBuilding::numberWorkers() const { return _d->currentWorkers;
 unsigned int WorkingBuilding::needWorkers() const { return maximumWorkers() - numberWorkers(); }
 unsigned int WorkingBuilding::productivity() const { return math::percentage( numberWorkers(), maximumWorkers() ); }
 unsigned int WorkingBuilding::laborAccessPercent() const { return _d->laborAccessKoeff; }
-bool WorkingBuilding::mayWork() const {  return numberWorkers() > 0; }
+bool WorkingBuilding::mayWork() const { return numberWorkers() > 0; }
 void WorkingBuilding::setActive(const bool value) { _d->isActive = value; }
 bool WorkingBuilding::isActive() const { return _d->isActive; }
 WorkingBuilding::~WorkingBuilding(){}
@@ -138,19 +153,18 @@ void WorkingBuilding::timeStep( const unsigned long time )
 {
   Building::timeStep( time );
 
-  WalkerList::iterator it=_d->walkerList.begin();
-  while( it != _d->walkerList.end() )
+  for( WalkerList::iterator it=_d->walkerList.begin(); it != _d->walkerList.end(); )
   {
     if( (*it)->isDeleted() ) { it = _d->walkerList.erase( it ); }
     else { ++it; }
   }
 
-  if( GameDate::isMonthChanged() && numberWorkers() > 0 )
+  if( game::Date::isMonthChanged() && numberWorkers() > 0 )
   {
     city::Helper helper( _city() );
     TilePos offset( 8, 8 );
     TilePos myPos = pos();
-    HouseList houses = helper.find<House>( building::house, myPos - offset, myPos + offset );
+    HouseList houses = helper.find<House>( objects::house, myPos - offset, myPos + offset );
     float averageDistance = 0;
     foreach( it, houses )
     {
@@ -166,12 +180,13 @@ void WorkingBuilding::timeStep( const unsigned long time )
     _d->laborAccessKoeff = math::clamp( math::percentage( averageDistance, 8 ) * 2, 25, 100 );
   }
 
-  _updateAnimation( time );
+  if( isActive() )
+    _updateAnimation( time );
 }
 
 void WorkingBuilding::_updateAnimation(const unsigned long time )
 {
-  if( GameDate::isDayChanged() )
+  if( game::Date::isDayChanged() )
   {
     if( mayWork() )
     {
@@ -280,12 +295,12 @@ std::string WorkingBuildingHelper::productivity2desc( WorkingBuildingPtr w, cons
 
   if( prefix.empty() )
   {
-    return StringHelper::format( 0xff, "##%s_%s##",
+    return utils::format( 0xff, "##%s_%s##",
                                  factoryType.c_str(), productivityDescription[ workKoeff ] );
   }
   else
   {
-    return StringHelper::format( 0xff, "##%s_%s_%s##",
+    return utils::format( 0xff, "##%s_%s_%s##",
                                  factoryType.c_str(), prefix.c_str(), productivityDescription[ workKoeff ] );
   }
 }

@@ -23,12 +23,20 @@
 #include "gfx/tilemap.hpp"
 #include "core/gettext.hpp"
 #include "objects/constants.hpp"
+#include "events/showinfobox.hpp"
+#include "objects_factory.hpp"
 
 using namespace gfx;
+using namespace constants;
 
-ClayPit::ClayPit() : Factory( Good::none, Good::clay, constants::building::clayPit, Size(2) )
+REGISTER_CLASS_IN_OVERLAYFACTORY(objects::clay_pit, ClayPit)
+
+ClayPit::ClayPit()
+  : Factory( good::none, good::clay, constants::objects::clay_pit, Size(2) )
 {
   _fgPicturesRef().resize(2);
+
+  _setUnworkingInterval( 8 );
 }
 
 void ClayPit::timeStep( const unsigned long time )
@@ -36,13 +44,21 @@ void ClayPit::timeStep( const unsigned long time )
   Factory::timeStep( time );
 }
 
-bool ClayPit::canBuild(PlayerCityPtr city, TilePos pos, const TilesArray& aroundTiles ) const
+void ClayPit::_reachUnworkingTreshold()
 {
-  bool is_constructible = Construction::canBuild( city, pos, aroundTiles );
+  Factory::_reachUnworkingTreshold();
+
+  events::GameEventPtr e = events::ShowInfobox::create( "##clay_pit_flooded##", "##clay_pit_flooded_by_low_support##");
+  e->dispatch();
+}
+
+bool ClayPit::canBuild( const CityAreaInfo& areaInfo ) const
+{
+  bool is_constructible = Construction::canBuild( areaInfo );
   bool near_water = false;
 
-  Tilemap& tilemap = city->tilemap();
-  TilesArray perimetr = tilemap.getRectangle( pos + TilePos( -1, -1), size() + Size( 2 ), Tilemap::checkCorners );
+  Tilemap& tilemap = areaInfo.city->tilemap();
+  TilesArray perimetr = tilemap.getRectangle( areaInfo.pos + TilePos( -1, -1), size() + Size( 2 ), Tilemap::checkCorners );
 
   foreach( tile, perimetr )  {  near_water |= (*tile)->getFlag( Tile::tlWater ); }
 

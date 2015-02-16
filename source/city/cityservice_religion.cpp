@@ -24,7 +24,8 @@
 #include "objects/religion.hpp"
 #include "religion/pantheon.hpp"
 #include "core/foreach.hpp"
-#include "core/stringhelper.hpp"
+#include "core/variant_map.hpp"
+#include "core/utils.hpp"
 #include "core/gettext.hpp"
 #include "objects/constants.hpp"
 #include "core/logger.hpp"
@@ -57,10 +58,10 @@ public:
   TemplesMap templesCoverity;
   DateTime lastMessageDate;
 
-  void updateRelation( PlayerCity& city, DivinityPtr divn );
+  void updateRelation(PlayerCityPtr city, DivinityPtr divn );
 };
 
-SrvcPtr Religion::create(PlayerCityPtr city)
+SrvcPtr Religion::create( PlayerCityPtr city )
 {
   SrvcPtr ret( new Religion( city ) );
   ret->drop();
@@ -70,16 +71,16 @@ SrvcPtr Religion::create(PlayerCityPtr city)
 
 std::string Religion::defaultName() { return CAESARIA_STR_EXT(Religion); }
 
-Religion::Religion(PlayerCityPtr city )
-  : Srvc( *city.object(), Religion::defaultName() ), _d( new Impl )
+Religion::Religion( PlayerCityPtr city )
+  : Srvc( city, Religion::defaultName() ), _d( new Impl )
 {
 }
 
-void Religion::update( const unsigned int time )
+void Religion::timeStep( const unsigned int time )
 {  
-  if( GameDate::isWeekChanged() )
+  if( game::Date::isWeekChanged() )
   {
-    if( _city.getOption( PlayerCity::godEnabled ) == 0 )
+    if( _city()->getOption( PlayerCity::godEnabled ) == 0 )
       return;
 
     Logger::warning( "Religion: start update relations" );
@@ -89,8 +90,8 @@ void Religion::update( const unsigned int time )
     _d->templesCoverity.clear();
 
     //update temples info
-    Helper helper( &_city );
-    TempleList temples = helper.find<Temple>( building::religionGroup );
+    Helper helper( _city() );
+    TempleList temples = helper.find<Temple>( objects::religionGroup );
     foreach( it, temples)
     {
       if( (*it)->divinity().isValid() )
@@ -154,13 +155,13 @@ void Religion::update( const unsigned int time )
 
     foreach( it, divinities )
     {
-      _d->updateRelation( _city, *it );
+      _d->updateRelation( _city(), *it );
     }
   }
 
-  if( GameDate::isMonthChanged() )
+  if( game::Date::isMonthChanged() )
   {
-    if( _city.getOption( PlayerCity::godEnabled ) == 0 )
+    if( _city()->getOption( PlayerCity::godEnabled ) == 0 )
       return;
 
     int goddesRandom = math::random( 20 );
@@ -210,7 +211,7 @@ void Religion::update( const unsigned int time )
 
     if( randomGod.isValid() )
     {
-      randomGod->checkAction( &_city );
+      randomGod->checkAction( _city() );
     }
   }
 }
@@ -228,24 +229,24 @@ void Religion::load(const VariantMap& stream)
 {
   Srvc::load( stream );
 
-  _d->lastMessageDate = stream.get( lc_lastMessageDate, GameDate::current() ).toDateTime();
+  _d->lastMessageDate = stream.get( lc_lastMessageDate, game::Date::current() ).toDateTime();
 }
 
-void Religion::Impl::updateRelation( PlayerCity& city, DivinityPtr divn )
+void Religion::Impl::updateRelation( PlayerCityPtr city, DivinityPtr divn )
 {
   Impl::CoverageInfo& myTemples = templesCoverity[ divn ];
   unsigned int faithValue = 0;
-  if( city.population() > 0 )
+  if( city->population() > 0 )
   {
-    faithValue = math::clamp( 100 * myTemples.parishionerNumber / city.population(), 0u, 100u );
+    faithValue = math::clamp( 100 * myTemples.parishionerNumber / city->population(), 0u, 100u );
   }
 
   Logger::warning( "Religion: set faith income for %s is %d [r=%f]", divn->name().c_str(), faithValue, divn->relation() );
-  divn->updateRelation( faithValue, &city );
+  divn->updateRelation( faithValue, city );
 
-  if( divn->relation() < 30 && lastMessageDate.monthsTo( GameDate::current() ) > 6 )
+  if( divn->relation() < 30 && lastMessageDate.monthsTo( game::Date::current() ) > 6 )
   {
-    lastMessageDate = GameDate::current();
+    lastMessageDate = game::Date::current();
     std::string text = divn->relation() < 10 ? "##gods_wrathful_text##" : "##gods_unhappy_text##";
     std::string title = divn->relation() < 10 ? "##gods_wrathful_title##" : "##gods_unhappy_title##";
 

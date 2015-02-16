@@ -19,6 +19,7 @@
 #include "gfx/engine.hpp"
 #include "gfx/decorator.hpp"
 #include "core/event.hpp"
+#include "core/variant_map.hpp"
 #include "gfx/pictureconverter.hpp"
 #include "core/color.hpp"
 
@@ -88,7 +89,7 @@ public:
 
   void breakText( const std::string& text, const Size& size );
 
-public oc3_signals:
+public signals:
   Signal0<> onClickedSignal;
 };
 
@@ -166,17 +167,19 @@ void Label::_updateTexture(gfx::Engine& painter )
         }
 
         Rect r = frameRect;
-        int height = _d->font.getTextSize("A").height();// + font.GetKerningHeight();
+        int height = _d->font.getTextSize("A").height();
 
-        for (unsigned int i=0; i<_d->brokenText.size(); ++i)
+        if( verticalTextAlign() == align::center )
         {
-            Rect textRect = _d->font.getTextRect( rText, r, horizontalTextAlign(), verticalTextAlign() );
+          r -= Point( 0, height * _d->brokenText.size() / 2 );
+        }
 
-            textRect += _d->textOffset;
-
-            _d->font.draw( *_d->textPicture, _d->brokenText[i], textRect.lefttop(), useAlpha4Text, false );
-
-            r += Point( 0, height + _d->lineIntervalOffset );
+        foreach( it, _d->brokenText )
+        {
+          Rect textRect = _d->font.getTextRect( *it, r, horizontalTextAlign(), verticalTextAlign() );
+          textRect += _d->textOffset;
+          _d->font.draw( *_d->textPicture, *it, textRect.lefttop(), useAlpha4Text, false );
+          r += Point( 0, height + _d->lineIntervalOffset );
         }        
       }
     }
@@ -221,7 +224,7 @@ void Label::_updateBackground(Engine& painter, bool& useAlpha4Text )
 
 void Label::_handleClick()
 {
-  oc3_emit _d->onClickedSignal();
+  emit _d->onClickedSignal();
 }
 
 //! destructor
@@ -343,7 +346,7 @@ void Label::Impl::breakText( const std::string& text, const Size& wdgSize )
 			c = rText[i];
 			bool lineBreak = false;
 
-			if (c == '\r') // Mac or Windows breaks
+			if( c == '\r' ) // Mac or Windows breaks
 			{
 				lineBreak = true;
 				if (rText[i+1] == '\n') // Windows breaks
@@ -626,16 +629,16 @@ void Label::setPrefixText( const string& prefix )
 
 void Label::setBackgroundPicture(const Picture& picture, Point offset )
 {
-    _d->bgPicture = picture;
-    _d->bgOffset = offset;
-    _d->needUpdatePicture = true;
+  _d->bgPicture = picture;
+  _d->bgOffset = offset;
+  _d->needUpdatePicture = true;
 }
 
 void Label::setIcon(const Picture& icon, Point offset )
 {
-    _d->icon = icon;
-    _d->iconOffset = offset;
-    _d->needUpdatePicture = true;
+  _d->icon = icon;
+  _d->iconOffset = offset;
+  _d->needUpdatePicture = true;
 }
 
 void Label::setFont( const Font& font )
@@ -647,6 +650,12 @@ void Label::setFont( const Font& font )
 void Label::setAlpha(unsigned int value)
 {
   _d->opaque = value;
+  _d->needUpdatePicture = true;
+}
+
+void Label::setColor(NColor color)
+{
+  _d->font.setColor( color );
   _d->needUpdatePicture = true;
 }
 

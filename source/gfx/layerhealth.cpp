@@ -29,9 +29,12 @@ using namespace constants;
 namespace gfx
 {
 
-int LayerHealth::type() const {  return _type; }
+namespace layer
+{
 
-int LayerHealth::_getLevelValue( HousePtr house )
+int Health::type() const {  return _type; }
+
+int Health::_getLevelValue( HousePtr house )
 {
   switch(_type)
   {
@@ -44,7 +47,7 @@ int LayerHealth::_getLevelValue( HousePtr house )
   return 0;
 }
 
-void LayerHealth::drawTile(Engine& engine, Tile& tile, const Point& offset)
+void Health::drawTile(Engine& engine, Tile& tile, const Point& offset)
 {
   Point screenPos = tile.mappos() + offset;
 
@@ -59,60 +62,34 @@ void LayerHealth::drawTile(Engine& engine, Tile& tile, const Point& offset)
     TileOverlayPtr overlay = tile.overlay();
 
     int healthLevel = -1;
-    switch( overlay->type() )
+    if( _isVisibleObject( overlay->type() ) )
     {
-    // Base set of visible objects
-    case construction::road:
-    case construction::plaza:
-    case construction::garden:
-
-    case building::burnedRuins:
-    case building::collapsedRuins:
-
-    case building::lowBridge:
-    case building::highBridge:
-
-    case building::elevation:
-    case building::rift:
+      // Base set of visible objects
       needDrawAnimations = true;
-    break;
+    }
+    else if( _flags.count( overlay->type() ) )
+    {
+      needDrawAnimations = true;
+      //city::Helper helper( _city() );
+      //drawArea( engine, helper.getArea( overlay ), offset, ResourceGroup::foodOverlay, OverlayPic::base );
+    }
+    else if( overlay->type() == objects::house )
+    {
+      HousePtr house = ptr_cast<House>( overlay );
+      healthLevel = _getLevelValue( house );
 
-    case building::doctor:
-    case building::hospital:
-    case building::barber:
-    case building::baths:
-      needDrawAnimations = _flags.count( overlay->type() ) > 0;
+      needDrawAnimations = (house->spec().level() == 1) && (house->habitants().empty());
+
       if( !needDrawAnimations )
       {
         city::Helper helper( _city() );
-        drawArea( engine, helper.getArea( overlay ), offset, ResourceGroup::foodOverlay, OverlayPic::base );
+        drawArea( engine, helper.getArea( overlay ), offset, ResourceGroup::foodOverlay, OverlayPic::inHouseBase );
       }
-    break;
-
-      //houses
-    case building::house:
-      {
-        HousePtr house = ptr_cast<House>( overlay );
-
-        healthLevel = _getLevelValue( house );
-
-        needDrawAnimations = (house->spec().level() == 1) && (house->habitants().empty());
-
-        if( !needDrawAnimations )
-        {
-          city::Helper helper( _city() );
-          drawArea( engine, helper.getArea( overlay ), offset, ResourceGroup::foodOverlay, OverlayPic::inHouseBase );
-        }
-      }
-    break;
-
-      //other buildings
-    default:
-      {
-        city::Helper helper( _city() );
-        drawArea( engine, helper.getArea( overlay ), offset, ResourceGroup::foodOverlay, OverlayPic::base );
-      }
-    break;
+    }
+    else  //other buildings
+    {
+      city::Helper helper( _city() );
+      drawArea( engine, helper.getArea( overlay ), offset, ResourceGroup::foodOverlay, OverlayPic::base );
     }
 
     if( needDrawAnimations )
@@ -122,22 +99,23 @@ void LayerHealth::drawTile(Engine& engine, Tile& tile, const Point& offset)
     }
     else if( healthLevel > 0 )
     {
-      drawColumn( engine, screenPos, healthLevel );
+      _addColumn( screenPos, healthLevel );
+      //drawColumn( engine, screenPos, healthLevel );
     }
   }
 
   tile.setWasDrawn();
 }
 
-LayerPtr LayerHealth::create(TilemapCamera& camera, PlayerCityPtr city, int type )
+LayerPtr Health::create(TilemapCamera& camera, PlayerCityPtr city, int type )
 {
-  LayerPtr ret( new LayerHealth( camera, city, type ) );
+  LayerPtr ret( new Health( camera, city, type ) );
   ret->drop();
 
   return ret;
 }
 
-void LayerHealth::handleEvent(NEvent& event)
+void Health::handleEvent(NEvent& event)
 {
   if( event.EventType == sEventMouse )
   {
@@ -188,35 +166,44 @@ void LayerHealth::handleEvent(NEvent& event)
   Layer::handleEvent( event );
 }
 
-LayerHealth::LayerHealth(Camera& camera, PlayerCityPtr city, int type)
-  : Layer( &camera, city )
+Health::Health(Camera& camera, PlayerCityPtr city, int type)
+  : Info( camera, city, 9 )
 {
-  _loadColumnPicture( 9 );
   _type = type;
 
   switch( type )
   {
   case citylayer::health:
+    _flags << objects::clinic << objects::hospital
+           << objects::barber << objects::baths;
+    _visibleWalkers() << walker::doctor << walker::surgeon
+                      << walker::barber << walker::bathlady;
+  break;
+
   case citylayer::doctor:
-    _flags.insert( building::doctor );
-    _addWalkerType( walker::doctor );
+    _flags << objects::clinic;
+    _visibleWalkers() << walker::doctor;
   break;
 
   case citylayer::hospital:
-    _flags.insert( building::hospital );
-    _addWalkerType( walker::surgeon );
+    _flags << objects::hospital;
+    _visibleWalkers() << walker::surgeon;
   break;
 
   case citylayer::barber:
-    _flags.insert( building::barber );
-    _addWalkerType( walker::barber );
+    _flags << objects::barber;
+    _visibleWalkers() << walker::barber;
   break;
 
   case citylayer::baths:
-    _flags.insert( building::baths );
-    _addWalkerType( walker::bathlady );
+    _flags << objects::baths;
+    _visibleWalkers() << walker::bathlady;
   break;
   }
+
+  _fillVisibleObjects( citylayer::health );
+}
+
 }
 
 }//end namespace gfx

@@ -20,13 +20,19 @@
 #include "gfx/tile.hpp"
 #include "city/city.hpp"
 #include "constants.hpp"
+#include "core/variant_map.hpp"
 #include "game/gamedate.hpp"
 #include "walker/serviceman.hpp"
 #include "walker/rioter.hpp"
 #include "walker/indigene.hpp"
+#include "objects_factory.hpp"
 
 using namespace constants;
 using namespace gfx;
+
+REGISTER_CLASS_IN_OVERLAYFACTORY(objects::native_hut, NativeHut)
+REGISTER_CLASS_IN_OVERLAYFACTORY(objects::native_center, NativeCenter)
+REGISTER_CLASS_IN_OVERLAYFACTORY(objects::native_field, NativeField)
 
 namespace {
 static const int rioterGenerateLevel = 80;
@@ -44,17 +50,20 @@ void NativeBuilding::save( VariantMap& stream) const
   Building::save(stream);
 }
 
-void NativeBuilding::load( const VariantMap& stream) {Building::load(stream);}
+void NativeBuilding::load( const VariantMap& stream)
+{
+  Building::load(stream);
+}
 
-bool NativeBuilding::build(PlayerCityPtr city, const TilePos& pos )
+bool NativeBuilding::build( const CityAreaInfo& info )
 {
   tile().setFlag( Tile::tlRock, true );
-  return Building::build( city, pos );
+  return Building::build( info );
 }
 
 bool NativeBuilding::canDestroy() const { return false; }
 
-NativeHut::NativeHut() : NativeBuilding( building::nativeHut, Size(1) )
+NativeHut::NativeHut() : NativeBuilding( objects::native_hut, Size(1) )
 {
   setPicture( ResourceGroup::housing, 49 );
   _discontent = 0;
@@ -74,7 +83,7 @@ void NativeHut::load( const VariantMap& stream) {Building::load(stream);}
 void NativeHut::timeStep(const unsigned long time)
 {
   NativeBuilding::timeStep( time );
-  if( GameDate::isDayChanged() )
+  if( game::Date::isDayChanged() )
   {
     _discontent = math::clamp<float>( _discontent+0.5, 0.f, 100.f );
     _day2look--;
@@ -119,7 +128,7 @@ float NativeHut::evaluateService(ServiceWalkerPtr walker)
 
 float NativeHut::discontent() const { return _discontent; }
 
-NativeCenter::NativeCenter() : NativeBuilding( building::nativeCenter, Size(2) )
+NativeCenter::NativeCenter() : NativeBuilding( objects::native_center, Size(2) )
 {
   setPicture( ResourceGroup::housing, 51 );
 }
@@ -136,7 +145,7 @@ void NativeCenter::store(unsigned int qty)
 
 }
 
-NativeField::NativeField() : NativeBuilding( building::nativeField, Size(1) )
+NativeField::NativeField() : NativeBuilding( objects::native_field, Size(1) )
 {
   _progress = 0;
   setPicture( ResourceGroup::commerce, 13 );
@@ -151,7 +160,7 @@ void NativeField::load( const VariantMap& stream) {Building::load(stream);}
 
 void NativeField::timeStep(const unsigned long time)
 {
-  if( GameDate::isDayChanged() )
+  if( game::Date::isDayChanged() )
   {
     int lastState = _progress / 20;
     _progress = math::clamp( _progress+1, 0u, 100u );

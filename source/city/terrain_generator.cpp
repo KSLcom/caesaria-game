@@ -20,6 +20,7 @@
 #include "game/resourcegroup.hpp"
 #include "core/logger.hpp"
 #include "game/game.hpp"
+#include "gfx/helper.hpp"
 #include "city/city.hpp"
 #include "vfs/file.hpp"
 #include "vfs/path.hpp"
@@ -410,7 +411,7 @@ static void __finalizeMap(Game& game, int pass )
         wtile.setFlag( Tile::tlCoast, true );
         Picture pic = Picture::load( ResourceGroup::land1a, start + rnd );
         wtile.setPicture( pic );
-        wtile.setOriginalImgId( TileHelper::convPicName2Id( pic.name() ) );
+        wtile.setOriginalImgId( imgid::fromResource( pic.name() ) );
       }
     }
 }
@@ -540,7 +541,7 @@ static void __createRivers(Game& game )
 
       foreach( it, wayTiles )
       {
-        TileOverlayPtr overlay = TileOverlayFactory::instance().create( constants::building::river );
+        TileOverlayPtr overlay = TileOverlayFactory::instance().create( constants::objects::river );
 
         //Picture pic = Picture::load( ResourceGroup::land1a, 62 + math::random( 57 ) );
         (*it)->setPicture( Picture::getInvalid() );
@@ -549,7 +550,8 @@ static void __createRivers(Game& game )
 
         bool isWater = (*it)->getFlag( Tile::tlWater );
 
-        overlay->build( oCity, (*it)->pos() );
+        CityAreaInfo info = { oCity, (*it)->pos(), TilesArray() };
+        overlay->build( info );
         oCity->overlays().push_back( overlay );
 
         if( isWater )
@@ -591,13 +593,14 @@ static void __createRoad(Game& game )
 
     foreach( it, wayTiles )
     {
-      TileOverlayPtr overlay = TileOverlayFactory::instance().create( constants::construction::road );
+      TileOverlayPtr overlay = TileOverlayFactory::instance().create( constants::objects::road );
 
       Picture pic = Picture::load( ResourceGroup::land1a, PicID::grassPic + math::random( PicID::grassPicsNumber ) );
       (*it)->setPicture( pic );
-      (*it)->setOriginalImgId( TileHelper::convPicName2Id( pic.name() ) );
+      (*it)->setOriginalImgId( imgid::fromResource( pic.name() ) );
 
-      overlay->build( oCity, (*it)->pos() );
+      CityAreaInfo info = { oCity, (*it)->pos(), TilesArray() };
+      overlay->build( info );
       oCity->overlays().push_back( overlay );
     }
 
@@ -637,7 +640,8 @@ void TerrainGenerator::create(Game& game, int n2size, float smooth, float terrai
   PlayerCityPtr oCity = game.city();
   Tilemap& oTilemap = oCity->tilemap();
   unsigned int mapSize = diamond_square.width();
-  oTilemap.resize( mapSize );
+
+  oCity->resize( mapSize );
 
   Logger::warning( "W:%d H:%d", diamond_square.width(), diamond_square.height() );
 
@@ -662,7 +666,7 @@ void TerrainGenerator::create(Game& game, int n2size, float smooth, float terrai
         tile.setFlag( Tile::tlDeepWater, true );
         Picture pic = Picture::load( ResourceGroup::land1a, 120 );
         tile.setPicture( pic );
-        tile.setOriginalImgId( TileHelper::convPicName2Id( pic.name() ) );
+        tile.setOriginalImgId( imgid::fromResource( pic.name() ) );
       }
       break;
 
@@ -672,7 +676,7 @@ void TerrainGenerator::create(Game& game, int n2size, float smooth, float terrai
         tile.setFlag( Tile::tlDeepWater, true );
         Picture pic = Picture::load( ResourceGroup::land1a, 120 );
         tile.setPicture( pic );
-        tile.setOriginalImgId( TileHelper::convPicName2Id( pic.name() ) );
+        tile.setOriginalImgId( imgid::fromResource( pic.name() ) );
       }
       break;
 
@@ -682,7 +686,7 @@ void TerrainGenerator::create(Game& game, int n2size, float smooth, float terrai
         tile.setFlag( Tile::tlWater, true );
         Picture pic = Picture::load( ResourceGroup::land1a, 120 );
         tile.setPicture( pic );
-        tile.setOriginalImgId( TileHelper::convPicName2Id( pic.name() ) );
+        tile.setOriginalImgId( imgid::fromResource( pic.name() ) );
       }
       break;
 
@@ -703,7 +707,7 @@ void TerrainGenerator::create(Game& game, int n2size, float smooth, float terrai
         }*/
         pic = Picture::load( ResourceGroup::land1a, 62 + math::random( 57 ) );
         tile.setPicture( pic );
-        tile.setOriginalImgId( TileHelper::convPicName2Id( pic.name() ) );
+        tile.setOriginalImgId( imgid::fromResource( pic.name() ) );
       }
       break;
 
@@ -727,9 +731,19 @@ void TerrainGenerator::create(Game& game, int n2size, float smooth, float terrai
           tile.setFlag( Tile::tlTree, true );
         }
 
-        Picture pic = Picture::load( ResourceGroup::land1a, start + math::random( rnd ) );
-        tile.setPicture( pic );
-        tile.setOriginalImgId( TileHelper::convPicName2Id( pic.name() ) );
+        Picture land = MetaDataHolder::randomPicture( constants::objects::terrain, Size(1) );
+        tile.setPicture( land );
+
+        Picture tree = Picture::load( ResourceGroup::land1a, start + math::random( rnd ) );
+        tile.setOriginalImgId( imgid::fromResource( tree.name() ) );
+
+        TileOverlayPtr overlay = TileOverlayFactory::instance().create( constants::objects::tree );
+        if( overlay != NULL )
+        {
+          CityAreaInfo info = { oCity, tile.pos(), TilesArray() };
+          overlay->build( info );
+          oCity->overlays().push_back( overlay );
+        }
       }
       break;
 
@@ -738,7 +752,7 @@ void TerrainGenerator::create(Game& game, int n2size, float smooth, float terrai
         Picture pic = Picture::load( ResourceGroup::land1a, 290 + math::random( 7 ) );
         tile.setFlag( Tile::tlRock, true );
         tile.setPicture( pic );
-        tile.setOriginalImgId( TileHelper::convPicName2Id( pic.name() ) );
+        tile.setOriginalImgId( imgid::fromResource( pic.name() ) );
       }
       break;
 
@@ -749,7 +763,7 @@ void TerrainGenerator::create(Game& game, int n2size, float smooth, float terrai
         //tile.setFlag( Tile::tlRock, true );
         tile.setPicture( pic );
         //tile.setHeight( 1 );
-        tile.setOriginalImgId( TileHelper::convPicName2Id( pic.name() ) );
+        tile.setOriginalImgId( imgid::fromResource( pic.name() ) );
       }
       break;
 

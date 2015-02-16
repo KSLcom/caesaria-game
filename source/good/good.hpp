@@ -25,38 +25,56 @@
 
 class VariantList;
 
-class Good
+namespace good
 {
-public:
-  typedef enum
-  {
-    none=0,
-    wheat, fish, meat, fruit, vegetable,
-    olive, oil,
-    grape, wine,
-    timber, furniture,
-    clay, pottery,
-    iron, weapon,
-    marble,
-    denaries,
-    prettyWine,
-    goodCount
-  } Type;
 
-  Type type() const { return _type; }
+class Product
+{
+public:  
+  explicit Product( int which=0) { _type = which; }
+  int toInt() const { return _type; }
+  bool operator==( const Product& a ) const { return _type == a._type; }
+  bool operator!=( const Product& a ) const { return _type != a._type; }
+  bool operator<( const Product& a ) const { return _type < a._type; }
+  bool operator>( const Product& a ) const { return _type > a._type; }
+  bool operator<=( const Product& a ) const { return _type <= a._type; }
+  Product& operator++() { ++_type; return *this; }
+  //int operator() const { return toInt(); }
 
 protected:
-  Type _type;
+  int _type;
 };
 
-class GoodStock : public Good
+const Product none( 0 );
+const Product wheat( 1 );
+const Product fish( 2 );
+const Product meat( 3 );
+const Product fruit( 4 );
+const Product vegetable( 5 );
+const Product olive( 6 );
+const Product oil( 7 );
+const Product grape( 8 );
+const Product wine( 9 );
+const Product timber( 10 );
+const Product furniture( 11 );
+const Product clay( 12 );
+const Product pottery( 13 );
+const Product iron( 14 );
+const Product weapon( 15 );
+const Product marble( 16 );
+const Product denaries( 17 );
+const Product prettyWine( 18 );
+const Product goodCount( 19 );
+
+class Stock : Product
 {
 public:
-  GoodStock();
-  GoodStock(const Good::Type &goodType, const int maxQty, const int currentQty=0);
-  ~GoodStock();
+  Stock();
+  Stock(const Product& which, const int maxQty, const int currentQty=0);
+  ~Stock();
 
-  void setType( Good::Type goodType );
+  void setType( Product goodType );
+  const Product& type() const;
 
   void setCapacity( const int maxQty );
   int capacity() const { return _capacity; }
@@ -70,7 +88,7 @@ public:
   void pop( const int qty );
 
   /** amount: if -1, amount=stock._currentQty */
-  void append(GoodStock &stock, const int amount = -1);
+  void append( Stock& stock, const int amount = -1);
 
   VariantList save() const;
   void load( const VariantList& options );
@@ -81,5 +99,9 @@ protected:
   int _capacity;
   int _qty;
 };
+
+class Store;
+
+}//end namespace good
     
 #endif //_CAESARIA_GOOD_H_INCLUDE_

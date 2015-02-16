@@ -28,9 +28,9 @@ namespace city
 class Religion : public Srvc
 {
 public:
-  static SrvcPtr create( PlayerCityPtr city );
+  static SrvcPtr create(PlayerCityPtr city);
   static std::string defaultName();
-  void update( const unsigned int time );
+  virtual void timeStep( const unsigned int time );
 
   virtual VariantMap save() const;
   virtual void load(const VariantMap& stream);

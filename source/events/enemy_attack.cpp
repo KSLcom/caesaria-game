@@ -21,11 +21,13 @@
 #include "game/gamedate.hpp"
 #include "events/dispatcher.hpp"
 #include "gfx/tilemap.hpp"
+#include "core/variant_map.hpp"
 #include "core/logger.hpp"
 #include "walker/enemysoldier.hpp"
 #include "city/cityservice_military.hpp"
 #include "walker/walkers_factory.hpp"
 #include "walker/helper.hpp"
+#include "factory.hpp"
 
 using namespace constants;
 using namespace gfx;
@@ -38,6 +40,8 @@ CAESARIA_LITERALCONST(type)
 CAESARIA_LITERALCONST(items)
 CAESARIA_LITERALCONST(target)
 }
+
+REGISTER_EVENT_IN_FACTORY(EnemyAttack, "enemy_attack" )
 
 class AttackPriorityHelper : public EnumsHelper<EnemySoldier::AttackPriority>
 {

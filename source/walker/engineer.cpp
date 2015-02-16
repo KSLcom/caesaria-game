@@ -17,8 +17,11 @@
 
 #include "engineer.hpp"
 #include "city/helper.hpp"
+#include "walkers_factory.hpp"
 
 using namespace constants;
+
+REGISTER_CLASS_IN_WALKERFACTORY(walker::engineer, Engineer)
 
 class Engineer::Impl
 {
@@ -34,26 +37,36 @@ WalkerPtr Engineer::create(PlayerCityPtr city)
 
 Engineer::~Engineer() {}
 
-std::string Engineer::currentThinks() const
+std::string Engineer::thoughts(Thought th) const
 {
-  if( _d->averageLevel > 70 )
+  switch( th )
   {
-    return "##engineer_have_trouble_buildings##";
+  case thCurrent:
+    if( _d->averageLevel > 70 )
+    {
+      return "##engineer_have_trouble_buildings##";
+    }
+
+    if( _d->averageLevel < 30 )
+    {
+      return "##engineer_no_trouble_buildings##";
+    }
+  break;
+
+  case thAction:
+  break;
+
+  default: break;
   }
 
-  if( _d->averageLevel < 30 )
-  {
-    return "##engineer_no_trouble_buildings##";
-  }
-
-  return ServiceWalker::currentThinks();
+  return ServiceWalker::thoughts(th);
 }
 
 void Engineer::_centerTile()
 {
   city::Helper helper( _city() );
   TilePos offset( reachDistance(), reachDistance() );
-  ConstructionList buildings = helper.find<Construction>( building::any, pos() - offset, pos() + offset );
+  ConstructionList buildings = helper.find<Construction>( objects::any, pos() - offset, pos() + offset );
   foreach( b, buildings )
   {
     if( !_d->_reachedBuildings.count( *b ) )

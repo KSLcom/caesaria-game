@@ -13,14 +13,15 @@
 // You should have received a copy of the GNU General Public License
 // along with CaesarIA.  If not, see <http://www.gnu.org/licenses/>.
 //
-// Copyright 2012-2014 Dalerank, dalerankn8@gmail.com
+// Copyright 2012-2015 Dalerank, dalerankn8@gmail.com
 
 #include "scribesmessages.hpp"
 #include "gameautopause.hpp"
 #include "listbox.hpp"
+#include "core/variant_map.hpp"
 #include "game/resourcegroup.hpp"
 #include "game/datetimehelper.hpp"
-#include "core/stringhelper.hpp"
+#include "core/utils.hpp"
 #include "widgetescapecloser.hpp"
 #include "city/cityservice_info.hpp"
 #include "city/city.hpp"
@@ -30,9 +31,11 @@
 #include "popup_messagebox.hpp"
 #include "texturedbutton.hpp"
 #include "core/color.hpp"
+#include "dictionary.hpp"
 #include "gfx/engine.hpp"
 #include "event_messagebox.hpp"
 #include "core/gettext.hpp"
+#include "gui/label.hpp"
 #include "widget_helper.hpp"
 
 using namespace constants;
@@ -70,7 +73,7 @@ public:
     return item;
   }
 
-public oc3_signals:
+public signals:
   Signal1<int> onShowMessage;
   Signal1<int> onRemoveMessage;
 
@@ -89,7 +92,7 @@ protected:
     VariantMap options = item.data().toMap();
     DateTime time = options[ lc_date ].toDateTime();
 
-    item.draw( DateTimeHelper::toStr( time ), font, Point( 30, 0 ) );
+    item.draw( util::date2str( time ), font, Point( 30, 0 ) );
     item.draw( item.text(), font, Point( width() / 2, 0 ));
   }
 
@@ -101,8 +104,8 @@ protected:
     {
       switch(event.mouse.type)
       {
-      case mouseLbtnRelease: oc3_emit onShowMessage( selected() ); break;
-      case mouseRbtnRelease: oc3_emit onRemoveMessage( selected() ); break;
+      case mouseLbtnRelease: emit onShowMessage( selected() ); break;
+      case mouseRbtnRelease: emit onRemoveMessage( selected() ); break;
       default: break;
 
       case mouseMoved:
@@ -133,6 +136,9 @@ public:
   GameAutoPause locker;
   ScribesListBox* lbxMessages;
   PlayerCityPtr city;
+  Label* lbInfo;
+  TexturedButton* btnExit;
+  TexturedButton* btnHelp;
 };
 
 ScribesMessagestWindow::~ScribesMessagestWindow() {}
@@ -151,17 +157,16 @@ ScribesMessagestWindow::ScribesMessagestWindow( Widget* p, PlayerCityPtr city )
   WidgetEscapeCloser::insertTo( this );
   _d->lbxMessages = new ScribesListBox( this, Rect( 16, 60, width() - 16, height() - 50 ) );
 
-  TexturedButton* btnExit;
-  TexturedButton* btnHelp;
-
-  GET_WIDGET_FROM_UI( btnHelp )
-  GET_WIDGET_FROM_UI( btnExit )
+  GET_DWIDGET_FROM_UI( _d, btnHelp )
+  GET_DWIDGET_FROM_UI( _d, btnExit )
+  GET_DWIDGET_FROM_UI( _d, lbInfo )
 
   _fillMessages();
 
   CONNECT( _d->lbxMessages, onShowMessage, this, ScribesMessagestWindow::_showMessage );
   CONNECT( _d->lbxMessages, onRemoveMessage, this, ScribesMessagestWindow::_removeMessage );
-  CONNECT( btnExit, onClicked(), this, ScribesMessagestWindow::deleteLater );
+  CONNECT( _d->btnExit, onClicked(), this, ScribesMessagestWindow::deleteLater );
+  CONNECT( _d->btnHelp, onClicked(), this, ScribesMessagestWindow::_showHelp );
 }
 
 void ScribesMessagestWindow::draw(gfx::Engine& painter )
@@ -179,9 +184,12 @@ void ScribesMessagestWindow::_fillMessages()
   city::InfoPtr srvc;
   srvc << _d->city->findService( city::Info::defaultName() );
 
+  bool haveMessages = false;
   if( srvc.isValid() )
   {
+
     const city::Info::Messages& messages = srvc->messages();
+    haveMessages = !messages.empty();
     foreach( it, messages )
     {
       const city::Info::ScribeMessage& mt = *it;
@@ -191,9 +199,28 @@ void ScribesMessagestWindow::_fillMessages()
       options[ lc_date   ] = mt.date;
       options[ lc_ext    ] = mt.ext;
 
-      item.setData( options );
+      item.setData( options );      
     }
   }
+
+  if( _d->lbInfo && !haveMessages )
+  {
+    Label* lbDate;
+    Label* lbSubj;
+
+    GET_WIDGET_FROM_UI( lbDate )
+    GET_WIDGET_FROM_UI( lbSubj )
+    lbDate->hide();
+    lbSubj->hide();
+    _d->lbxMessages->hide();
+    _d->lbInfo->setCenter( screenToLocal( center() ) );
+    _d->lbInfo->setText( _("##srcw_no_messages##") );
+  }
+}
+
+void ScribesMessagestWindow::_showHelp()
+{
+  DictionaryWindow::show( this, "scribes_messages" );
 }
 
 void ScribesMessagestWindow::_showMessage(int index)

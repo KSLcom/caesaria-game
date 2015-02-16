@@ -18,7 +18,13 @@
 #include "game/gamedate.hpp"
 #include "core/priorities.hpp"
 #include "objects/house.hpp"
+#include "cityservice_military.hpp"
 #include "objects/house_level.hpp"
+#include "walker/rioter.hpp"
+#include "events/disaster.hpp"
+#include "events/showinfobox.hpp"
+#include "core/logger.hpp"
+#include "core/variant_map.hpp"
 #include <set>
 
 using namespace constants;
@@ -26,68 +32,75 @@ using namespace constants;
 namespace city
 {
 
-namespace {
-  CAESARIA_LITERALCONST(peaceYears)
-  CAESARIA_LITERALCONST(protestorOrMugglerSeen)
-  CAESARIA_LITERALCONST(rioterSeen)
-  CAESARIA_LITERALCONST(value)
-  CAESARIA_LITERALCONST(significantBuildingsDestroyed)
-}
-
 class Peace::Impl
 {
 public:
-  PlayerCityPtr city;
   unsigned int peaceYears;
   bool protestorOrMugglerSeen;
   bool rioterSeen;
+  bool someCriminalSeen;
   int value;
   bool significantBuildingsDestroyed;
+  DateTime lastMessageDate;
 
   Priorities<int> unsignificantBuildings;
 };
 
-city::SrvcPtr Peace::create(PlayerCityPtr city )
+city::SrvcPtr Peace::create( PlayerCityPtr city )
 {
-  Peace* ret = new Peace( city );
+  city::SrvcPtr ret( new Peace( city ) );
+  ret->drop();
 
-  return city::SrvcPtr( ret );
+  return ret;
 }
 
-Peace::Peace(PlayerCityPtr city )
-  : city::Srvc( *city.object(), getDefaultName() ), _d( new Impl )
+Peace::Peace( PlayerCityPtr city )
+  : city::Srvc( city, defaultName() ), _d( new Impl )
 {
-  _d->city = city;
   _d->peaceYears = 0;
   _d->protestorOrMugglerSeen = false;
+  _d->someCriminalSeen = false;
   _d->rioterSeen = false;
   _d->value = 0;
   _d->significantBuildingsDestroyed = false;
 
-  _d->unsignificantBuildings << building::prefecture
-                         << building::engineerPost
-                         << building::well
-                         << building::fortArea
-                         << building::fortJavelin
-                         << building::fortLegionaire
-                         << building::fortMounted
-                         << building::gatehouse
-                         << building::fortification
-                         << construction::road
-                         << construction::plaza
-                         << building::highBridge
-                         << building::lowBridge
-                         << building::tower;
+  _d->unsignificantBuildings << objects::prefecture
+                         << objects::engineering_post
+                         << objects::well
+                         << objects::fortArea
+                         << objects::fort_javelin
+                         << objects::fort_legionaries
+                         << objects::fort_horse
+                         << objects::gatehouse
+                         << objects::fortification
+                         << objects::road
+                         << objects::plaza
+                         << objects::high_bridge
+                         << objects::low_bridge
+                         << objects::tower;
 }
 
-void Peace::update( const unsigned int time )
+void Peace::timeStep(const unsigned int time )
 {
-  if( !GameDate::isYearChanged() )
+  if( !game::Date::isYearChanged() )
     return;
 
-  int change = _d->protestorOrMugglerSeen ? -1: 0;
-  change = std::min( _d->rioterSeen ? -5 : 0, _d->value );
-  change = std::min( _d->significantBuildingsDestroyed ? -1 : 0, _d->value );
+  city::MilitaryPtr ml;
+  ml << _city()->findService( city::Military::defaultName() );
+
+  int change= _d->protestorOrMugglerSeen ? -1: 0;
+
+  if( ml.isValid() )
+  {
+    if( ml->haveNotification( city::Military::Notification::chastener ) )
+      change -= 1;
+
+    if( ml->haveNotification( city::Military::Notification::barbarian ) )
+      change -= 1;
+  }
+
+  change -= std::min( _d->rioterSeen ? -5 : 0, _d->value );
+  change -= std::min( _d->significantBuildingsDestroyed ? -1 : 0, _d->value );
 
   if( change == 0 )
   {
@@ -103,17 +116,39 @@ void Peace::update( const unsigned int time )
     _d->peaceYears++;
   }
 
-  _d->value = math::clamp( _d->value + change, 0, 100  );
+  change = math::clamp<int>( change, -5, 5 );
+
+  _d->value = math::clamp<int>( _d->value + change, 0, 100  );
   _d->protestorOrMugglerSeen  = false;
   _d->rioterSeen = false;
   _d->significantBuildingsDestroyed = false;
 }
 
-void Peace::addProtestor() {  _d->protestorOrMugglerSeen = true; }
-void Peace::addRioter() { _d->rioterSeen = true; }
-
-void Peace::buildingDestroyed(gfx::TileOverlayPtr overlay)
+void Peace::addCriminal( WalkerPtr wlk )
 {
+  if( is_kind_of<Rioter>( wlk ) )
+  {
+    _d->rioterSeen = true;
+  }
+  /*else if( is_kind_of<Protestor>( wlk ) )
+  {
+    _d->protestorOrMugglerSeen = true;
+  }*/
+  else
+  {
+    Logger::warning( "Peace:addCriminal unknown walker %d", wlk->type() );
+    _d->someCriminalSeen = true;
+  }
+}
+
+void Peace::buildingDestroyed(gfx::TileOverlayPtr overlay, int why)
+{
+  if( overlay.isNull() )
+  {
+    Logger::warning( "WARNING!!! Peace::buildingDestroyed overlay is null" );
+    return;
+  }
+
   HousePtr house = ptr_cast<House>( overlay );
   if( house.isValid() && house->spec().level() > HouseLevel::tent )
   {
@@ -123,34 +158,74 @@ void Peace::buildingDestroyed(gfx::TileOverlayPtr overlay)
   {
     _d->significantBuildingsDestroyed |= !_d->unsignificantBuildings.count( overlay->type() );
   }
+
+  if( _d->lastMessageDate.monthsTo( game::Date::current() ) > 1 )
+  {
+    std::string title;
+    std::string text;
+    std::string video;
+
+    _d->lastMessageDate = game::Date::current();
+
+    switch( why )
+    {
+    case events::Disaster::collapse:
+      title = "##collapsed_building_title##";
+      text = "##collapsed_building_text##";
+    break;
+
+    case events::Disaster::fire:
+      title = "##city_fire_title##";
+      text = "##city_fire_text##";
+      video = ":/smk/city_fire.smk";
+    break;
+
+    case events::Disaster::riots:
+      title = "##destroyed_building_title##";
+      text = "##rioter_rampaging_accross_city##";
+      video = ":/smk/riot.smk";
+    break;
+    }
+
+    if( !title.empty() )
+    {
+      events::GameEventPtr e = events::ShowInfobox::create( title, text, false, video );
+      e->dispatch();
+    }
+  }
 }
 
 int Peace::value() const { return _d->value; }
+std::string Peace::defaultName() { return CAESARIA_STR_EXT(Peace); }
 
-std::string Peace::getDefaultName()
+std::string Peace::reason() const
 {
-  return CAESARIA_STR_EXT(Peace);
+  if( _d->rioterSeen ) { return "##last_riots_bad_for_peace_rating##"; }
+
+  return "";
 }
 
 VariantMap Peace::save() const
 {
   VariantMap ret;
-  ret[ lc_peaceYears ] = (int)_d->peaceYears;
-  ret[ lc_protestorOrMugglerSeen ] = _d->protestorOrMugglerSeen;
-  ret[ lc_rioterSeen ] = _d->rioterSeen;
-  ret[ lc_value ] = _d->value;
-  ret[ lc_significantBuildingsDestroyed ] = _d->significantBuildingsDestroyed;
+  VARIANT_SAVE_ANY_D( ret, _d, peaceYears )
+  VARIANT_SAVE_ANY_D( ret, _d, someCriminalSeen )
+  VARIANT_SAVE_ANY_D( ret, _d, protestorOrMugglerSeen)
+  VARIANT_SAVE_ANY_D( ret, _d, rioterSeen )
+  VARIANT_SAVE_ANY_D( ret, _d, value )
+  VARIANT_SAVE_ANY_D( ret, _d, significantBuildingsDestroyed )
 
   return ret;
 }
 
 void Peace::load(const VariantMap& stream)
 {
-  _d->peaceYears = stream.get( lc_peaceYears, 0 ).toUInt();
-  _d->protestorOrMugglerSeen = stream.get( lc_protestorOrMugglerSeen );
-  _d->rioterSeen = stream.get( lc_rioterSeen );
-  _d->value = stream.get( lc_value );
-  _d->significantBuildingsDestroyed = stream.get( lc_significantBuildingsDestroyed );
+  VARIANT_LOAD_ANY_D( _d, peaceYears, stream )
+  VARIANT_LOAD_ANY_D( _d, someCriminalSeen, stream )
+  VARIANT_LOAD_ANY_D( _d, protestorOrMugglerSeen, stream )
+  VARIANT_LOAD_ANY_D( _d, rioterSeen, stream )
+  VARIANT_LOAD_ANY_D( _d, value, stream )
+  VARIANT_LOAD_ANY_D( _d, significantBuildingsDestroyed, stream )
 }
 
 }

@@ -18,6 +18,7 @@
 #include "image.hpp"
 #include "gfx/engine.hpp"
 #include "gfx/decorator.hpp"
+#include "core/variant_map.hpp"
 #include "gfx/pictureconverter.hpp"
 #include "core/color.hpp"
 
@@ -37,7 +38,7 @@ public:
   {
   }
 
-public oc3_signals:
+public signals:
 	Signal0<> onClickedSignal;
 };
 
@@ -116,6 +117,12 @@ Signal0<>& Image::onClicked(){  return _d->onClickedSignal;}
 void Image::setPicture( Picture picture )
 {
   _d->bgPicture = picture;
+
+	if( _d->mode == image )
+	{
+		setWidth( picture.width() );
+		setHeight( picture.height() );
+	}
 }
 
 void Image::setupUI(const VariantMap& ui)

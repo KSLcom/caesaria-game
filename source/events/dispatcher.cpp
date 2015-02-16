@@ -16,10 +16,13 @@
 // Copyright 2012-2014 Dalerank, dalerankn8@gmail.com
 
 #include "dispatcher.hpp"
-#include "core/stringhelper.hpp"
+#include "core/utils.hpp"
 #include "core/foreach.hpp"
 #include "postpone.hpp"
+#include "core/variant_map.hpp"
 #include "core/logger.hpp"
+#include "core/stacktrace.hpp"
+#include "core/saveadapter.hpp"
 
 namespace events
 {
@@ -30,6 +33,7 @@ public:
   typedef SmartList< GameEvent > Events;
 
   Events events;
+  Events newEvents;
 };
 
 Dispatcher::Dispatcher() : _d( new Impl )
@@ -42,11 +46,12 @@ void Dispatcher::append(GameEventPtr event)
 {
   if( event.isValid() )
   {
-    _d->events.push_back( event );
+    _d->newEvents.push_back( event );
   }
   else
   {
-    Logger::warning( "Null event" );
+    Logger::warning( "EventsDispatcher: cant add event but is null" );
+    Stacktrace::print();
   }
 }
 
@@ -56,10 +61,23 @@ void Dispatcher::update(Game& game, unsigned int time )
   {
     GameEventPtr e = *it;
 
-    e->tryExec( game, time );
+    try
+    {
+      e->tryExec( game, time );
 
-    if( e->isDeleted() ) { it = _d->events.erase( it ); }
-    else { ++it; }
+      if( e->isDeleted() ) { it = _d->events.erase( it ); }
+      else { ++it; }
+    }
+    catch(...)
+    {
+      _d->events.erase( it );
+    }
+  }
+
+  if( !_d->newEvents.empty() )
+  {
+    _d->events << _d->newEvents;
+    _d->newEvents.clear();
   }
 }
 
@@ -69,7 +87,7 @@ VariantMap Dispatcher::save() const
   int index = 0;
   foreach( event, _d->events )
   {
-    ret[ StringHelper::format( 0xff, "event_%d", index++ ) ] = (*event)->save();
+    ret[ utils::format( 0xff, "event_%d", index++ ) ] = (*event)->save();
   }
 
   return ret;
@@ -85,7 +103,17 @@ void Dispatcher::load(const VariantMap& stream)
     {
       append( e );
     }
-    }
+  }
+}
+
+void Dispatcher::load(vfs::Path filename, const std::string& section)
+{
+  VariantMap vm = config::load( filename );
+
+  if( !section.empty() )
+    vm = vm.get( section ).toMap();
+
+  load( vm );
 }
 
 void Dispatcher::reset() { _d->events.clear(); }

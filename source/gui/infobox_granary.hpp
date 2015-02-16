@@ -30,10 +30,10 @@ namespace infobox
 class AboutGranary : public AboutConstruction
 {
 public:
-  AboutGranary( Widget* parent, const gfx::Tile& tile );
+  AboutGranary( Widget* parent, PlayerCityPtr city, const gfx::Tile& tile );
   virtual ~AboutGranary();
   
-  void drawGood(Good::Type goodType, int, int);
+  void drawGood(good::Product goodType, int, int);
   void showSpecialOrdersWindow();
 
 private:

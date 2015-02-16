@@ -27,6 +27,9 @@
 #include "gfx/renderer.hpp"
 #include "core/direction.hpp"
 #include "game/predefinitions.hpp"
+#include "core/debug_queue.hpp"
+
+class MetaData;
 
 struct Desirability
 {
@@ -35,6 +38,13 @@ struct Desirability
  int base;
  int range;
  int step;
+};
+
+struct CityAreaInfo
+{
+  PlayerCityPtr city;
+  TilePos pos;
+  const gfx::TilesArray& aroundTiles;
 };
 
 namespace gfx
@@ -62,12 +72,12 @@ public:
   virtual bool isFlat() const;
   virtual void initTerrain( gfx::Tile& terrain ) = 0;
 
-  virtual bool build( PlayerCityPtr city, const TilePos& pos );
+  virtual bool build( const CityAreaInfo& info );
   virtual void destroy();  // handles the delete
 
   virtual Point offset(const Tile &tile, const Point& subpos ) const;
   virtual void timeStep(const unsigned long time);  // perform one simulation step
-  virtual void changeDirection(constants::Direction direction);
+  virtual void changeDirection(Tile *masterTile, constants::Direction direction);
 
   // graphic
   virtual void setPicture(Picture picture);
@@ -93,6 +103,8 @@ public:
   virtual void save( VariantMap& stream) const;
   virtual void load( const VariantMap& stream );
 
+  virtual void initialize( const MetaData& mdata );
+
 protected:
   gfx::Animation& _animationRef();
   gfx::Tile* _masterTile();
@@ -105,6 +117,14 @@ private:
   class Impl;
   ScopedPtr< Impl > _d;
 };
+
+#ifdef DEBUG
+class OverlayDebugQueue : public DebugQueue<TileOverlay>
+{
+public:
+  static void print();
+};
+#endif
 
 }//end namespace gfx
 

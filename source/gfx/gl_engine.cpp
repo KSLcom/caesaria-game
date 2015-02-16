@@ -26,6 +26,7 @@
 #include <iostream>
 #include <vector>
 #include <SDL.h>
+#include "core/variant_map.hpp"
 #include "core/logger.hpp"
 #include "core/exception.hpp"
 #include "picture.hpp"
@@ -35,7 +36,8 @@
 #include "vfs/file.hpp"
 #include "game/settings.hpp"
 #include "core/saveadapter.hpp"
-#include "ttf/SDL_ttf.h"
+#include <SDL_ttf.h>
+
 
 #ifndef CAESARIA_PLATFORM_WIN
   #define GL_GLEXT_PROTOTYPES
@@ -43,7 +45,6 @@
 
 #ifdef CAESARIA_PLATFORM_ANDROID
   #define glOrtho glOrthof
-  #undef CAESRAIA_USE_SHADERS
   #undef CAESARIA_USE_FRAMEBUFFER
   #include <SDL_opengles.h>
   #define USE_GLES
@@ -81,22 +82,24 @@
     PFNGLCHECKFRAMEBUFFERSTATUSEXTPROC glCheckFramebufferStatusEXT;
   #endif
 
-  #define glGenFramebuffers  glGenFramebuffersEXT
-  #define glGenTextures     glGenTexturesEXT
-  #define glGenRenderbuffers glGenRenderbuffersEXT
-  #define glBindFramebuffer glBindFramebufferEXT
-  #define glBindRenderbuffer glBindRenderbufferEXT
-  #define glRenderbufferStorage glRenderbufferStorageEXT
-  #define glFramebufferRenderbuffer glFramebufferRenderbufferEXT
-  #define glCheckFramebufferStatus glCheckFramebufferStatusEXT
-  #define glFramebufferTexture2D glFramebufferTexture2DEXT
+  #ifndef CAESARIA_PLATFORM_MACOSX
+    #define glGenFramebuffers         glGenFramebuffersEXT
+    #define glGenTextures             glGenTexturesEXT
+    #define glGenRenderbuffers        glGenRenderbuffersEXT
+    #define glBindFramebuffer         glBindFramebufferEXT
+    #define glBindRenderbuffer        glBindRenderbufferEXT
+    #define glRenderbufferStorage     glRenderbufferStorageEXT
+    #define glFramebufferRenderbuffer glFramebufferRenderbufferEXT
+    #define glCheckFramebufferStatus  glCheckFramebufferStatusEXT
+    #define glFramebufferTexture2D    glFramebufferTexture2DEXT
+  #endif
 #else
   #undef CAESARIA_USE_SHADERS
 #endif
 
 #include "core/font.hpp"
 #include "pictureconverter.hpp"
-#include "core/stringhelper.hpp"
+#include "core/utils.hpp"
 #include "core/time.hpp"
 #include "IMG_savepng.h"
 
@@ -173,9 +176,16 @@ void FrameBuffer::_createFramebuffer( unsigned int& id )
 {
   unsigned int colorbuffer, depthbuffer;
 
+  if( id != 0 )
+  {
+    glDeleteTextures( 1, &id );
+    id = 0;
+  }
+
 #ifndef GL_DRAW_FRAMEBUFFER
   #define GL_DRAW_FRAMEBUFFER               0x8CA9
 #endif
+
   glGenFramebuffers(1, &id);
   glGenTextures(1, &colorbuffer);
   glGenRenderbuffers(1, &depthbuffer);
@@ -445,7 +455,7 @@ EffectManager::EffectManager() {}
 
 void EffectManager::load(vfs::Path effectModel)
 {
-  VariantMap stream = SaveAdapter::load( effectModel );
+  VariantMap stream = config::load( effectModel );
 
   VariantMap technique = stream.get( CAESARIA_STR_EXT(technique) ).toMap();
 
@@ -456,7 +466,7 @@ void EffectManager::load(vfs::Path effectModel)
     std::string shaderFile = variables.get( "shader" ).toString();
     variables.erase( "shader" );
 
-    effect->loadProgramm( GameSettings::rcpath( shaderFile ) );
+    effect->loadProgramm( game::Settings::rcpath( shaderFile ) );
     effect->setVariables( variables );
 
     _effects.push_back( effect );
@@ -478,6 +488,8 @@ class GlEngine::Impl
 public:
   SDL_GLContext context;
   SDL_Window* window;
+  Size viewportSize;
+  bool useViewport;
 
 #ifdef CAESARIA_USE_FRAMEBUFFER
   FrameBuffer fb;
@@ -492,7 +504,7 @@ public:
   {
     if (window == NULL)
     {
-      Logger::warning( StringHelper::format( 0xff, "CRITICAL!!! Unable to create SDL-window: %d", SDL_GetError() ) );
+      Logger::warning( utils::format( 0xff, "CRITICAL!!! Unable to create SDL-window: %s", SDL_GetError() ) );
       THROW("Failed to create window");
     }
   }
@@ -514,11 +526,11 @@ void GlEngine::init()
   rc = TTF_Init();
   if (rc != 0) THROW("Unable to initialize SDL: " << SDL_GetError());
 
-  Logger::warning( StringHelper::format( 0xff, "SDLGraficEngine: set mode %dx%d",  _srcSize.width(), _srcSize.height() ) );
+  Logger::warning( utils::format( 0xff, "SDLGraficEngine: set mode %dx%d",  _srcSize.width(), _srcSize.height() ) );
 
 #ifdef USE_GLES
   //_srcSize = Size( mode.w, mode.h );
-  Logger::warning( StringHelper::format( 0xff, "SDLGraficEngine: Android set mode %dx%d",  _srcSize.width(), _srcSize.height() ) );
+  Logger::warning( utils::format( 0xff, "SDLGraficEngine: Android set mode %dx%d",  _srcSize.width(), _srcSize.height() ) );
 
   SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
   SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
@@ -556,6 +568,9 @@ void GlEngine::init()
   }
 
   _d->throwIfnoWindow();
+  _d->viewportSize = _srcSize;
+  _virtualSize = _srcSize;
+  _d->useViewport = false;
 
   SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
   SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
@@ -565,33 +580,35 @@ void GlEngine::init()
   Logger::warning("SDLGraficEngine: init successfull");
 #endif
 
-#ifndef GL_GLEXT_PROTOTYPES
-  ASSIGNGLFUNCTION(PFNGLCREATESHADERPROC,glCreateShader)
-  ASSIGNGLFUNCTION(PFNGLSHADERSOURCEPROC,glShaderSource)
-  ASSIGNGLFUNCTION(PFNGLCOMPILESHADERPROC,glCompileShader)
-  ASSIGNGLFUNCTION(PFNGLGETSHADERIVPROC,glGetShaderiv)
-  ASSIGNGLFUNCTION(PFNGLUSEPROGRAMPROC,glUseProgram)
-  ASSIGNGLFUNCTION(PFNGLUNIFORM1IPROC,glUniform1i)
-  ASSIGNGLFUNCTION(PFNGLUNIFORM1FPROC,glUniform1f)
-  ASSIGNGLFUNCTION(PFNGLUNIFORM2IPROC,glUniform2i)
-  ASSIGNGLFUNCTION(PFNGLUNIFORM2FPROC,glUniform2f)
-  ASSIGNGLFUNCTION(PFNGLGETUNIFORMLOCATIONPROC,glGetUniformLocation)
-  ASSIGNGLFUNCTION(PFNGLGETSHADERINFOLOGPROC,glGetShaderInfoLog)
-  ASSIGNGLFUNCTION(PFNGLDELETESHADERPROC,glDeleteShader)
-  ASSIGNGLFUNCTION(PFNGLCREATEPROGRAMPROC,glCreateProgram)
-  ASSIGNGLFUNCTION(PFNGLATTACHSHADERPROC,glAttachShader)
-  ASSIGNGLFUNCTION(PFNGLLINKPROGRAMPROC,glLinkProgram)
-  ASSIGNGLFUNCTION(PFNGLGETPROGRAMIVPROC,glGetProgramiv)
-  ASSIGNGLFUNCTION(PFNGLGENFRAMEBUFFERSEXTPROC,glGenFramebuffersEXT)
-  ASSIGNGLFUNCTION(PFNGLGENTEXTURESEXTPROC,glGenTexturesEXT)
-  ASSIGNGLFUNCTION(PFNGLGENRENDERBUFFERSEXTPROC,glGenRenderbuffersEXT)
-  ASSIGNGLFUNCTION(PFNGLBINDFRAMEBUFFEREXTPROC,glBindFramebufferEXT)
-  ASSIGNGLFUNCTION(PFNGLFRAMEBUFFERTEXTURE2DEXTPROC,glFramebufferTexture2DEXT)
-  ASSIGNGLFUNCTION(PFNGLBINDRENDERBUFFEREXTPROC,glBindRenderbufferEXT)
-  ASSIGNGLFUNCTION(PFNGLRENDERBUFFERSTORAGEEXTPROC,glRenderbufferStorageEXT)
-  ASSIGNGLFUNCTION(PFNGLFRAMEBUFFERRENDERBUFFEREXTPROC,glFramebufferRenderbufferEXT)
-  ASSIGNGLFUNCTION(PFNGLCHECKFRAMEBUFFERSTATUSEXTPROC,glCheckFramebufferStatusEXT)
-#endif
+#ifdef CAESARIA_USE_FRAMEBUFFER
+  #ifndef GL_GLEXT_PROTOTYPES
+    ASSIGNGLFUNCTION(PFNGLCREATESHADERPROC,glCreateShader)
+    ASSIGNGLFUNCTION(PFNGLSHADERSOURCEPROC,glShaderSource)
+    ASSIGNGLFUNCTION(PFNGLCOMPILESHADERPROC,glCompileShader)
+    ASSIGNGLFUNCTION(PFNGLGETSHADERIVPROC,glGetShaderiv)
+    ASSIGNGLFUNCTION(PFNGLUSEPROGRAMPROC,glUseProgram)
+    ASSIGNGLFUNCTION(PFNGLUNIFORM1IPROC,glUniform1i)
+    ASSIGNGLFUNCTION(PFNGLUNIFORM1FPROC,glUniform1f)
+    ASSIGNGLFUNCTION(PFNGLUNIFORM2IPROC,glUniform2i)
+    ASSIGNGLFUNCTION(PFNGLUNIFORM2FPROC,glUniform2f)
+    ASSIGNGLFUNCTION(PFNGLGETUNIFORMLOCATIONPROC,glGetUniformLocation)
+    ASSIGNGLFUNCTION(PFNGLGETSHADERINFOLOGPROC,glGetShaderInfoLog)
+    ASSIGNGLFUNCTION(PFNGLDELETESHADERPROC,glDeleteShader)
+    ASSIGNGLFUNCTION(PFNGLCREATEPROGRAMPROC,glCreateProgram)
+    ASSIGNGLFUNCTION(PFNGLATTACHSHADERPROC,glAttachShader)
+    ASSIGNGLFUNCTION(PFNGLLINKPROGRAMPROC,glLinkProgram)
+    ASSIGNGLFUNCTION(PFNGLGETPROGRAMIVPROC,glGetProgramiv)
+    ASSIGNGLFUNCTION(PFNGLGENFRAMEBUFFERSEXTPROC,glGenFramebuffersEXT)
+    ASSIGNGLFUNCTION(PFNGLGENTEXTURESEXTPROC,glGenTexturesEXT)
+    ASSIGNGLFUNCTION(PFNGLGENRENDERBUFFERSEXTPROC,glGenRenderbuffersEXT)
+    ASSIGNGLFUNCTION(PFNGLBINDFRAMEBUFFEREXTPROC,glBindFramebufferEXT)
+    ASSIGNGLFUNCTION(PFNGLFRAMEBUFFERTEXTURE2DEXTPROC,glFramebufferTexture2DEXT)
+    ASSIGNGLFUNCTION(PFNGLBINDRENDERBUFFEREXTPROC,glBindRenderbufferEXT)
+    ASSIGNGLFUNCTION(PFNGLRENDERBUFFERSTORAGEEXTPROC,glRenderbufferStorageEXT)
+    ASSIGNGLFUNCTION(PFNGLFRAMEBUFFERRENDERBUFFEREXTPROC,glFramebufferRenderbufferEXT)
+    ASSIGNGLFUNCTION(PFNGLCHECKFRAMEBUFFERSTATUSEXTPROC,glCheckFramebufferStatusEXT)
+  #endif //GL_GLEXT_PROTOTYPES
+#endif //CAESARIA_USE_FRAMEBUFFER
 
   SDL_DisplayMode mode;
   SDL_GetCurrentDisplayMode(0, &mode);
@@ -617,7 +634,10 @@ void GlEngine::init()
   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
   Logger::warning( "GrafixEngine: set caption");
-  SDL_SetWindowTitle( _d->window, "CaesarIA:gl "CAESARIA_VERSION );
+  std::string versionStr = utils::format(0xff, "CaesarIA: OpenGL %d.%d R%d [%s:%s]",
+                                                 CAESARIA_VERSION_MAJOR, CAESARIA_VERSION_MINOR, CAESARIA_VERSION_REVSN,
+                                                 CAESARIA_PLATFORM_NAME, CAESARIA_COMPILER_NAME );
+  SDL_SetWindowTitle( _d->window, versionStr.c_str() );
 
   //!!!!!
 #ifdef CAESARIA_USE_FRAMEBUFFER
@@ -653,12 +673,12 @@ void GlEngine::setFlag( int flag, int value )
   }
 }
 
-Picture* GlEngine::createPicture(const Size& size )
+Picture* GlEngine::createPicture( const Size& size )
 {
   SDL_Surface* img = SDL_CreateRGBSurface( 0, size.width(), size.height(), 32,
                                            0x00ff0000, 0x0000ff00, 0x000000ff, 0xff000000 );
 
-  Logger::warningIf( NULL == img, StringHelper::format( 0xff, "GlEngine:: can't make surface, size=%dx%d", size.width(), size.height() ) );
+  Logger::warningIf( NULL == img, utils::format( 0xff, "GlEngine:: can't make surface, size=%dx%d", size.width(), size.height() ) );
 
   Picture *pic = new Picture();
   pic->init( 0, img, 0 );  // no offset
@@ -686,7 +706,7 @@ void GlEngine::unloadPicture(Picture& ioPicture)
   ioPicture = Picture();
 }
 
-static int power_of_2(int input)
+/*static int power_of_2(int input)
 {
     int value = 1;
 
@@ -695,7 +715,7 @@ static int power_of_2(int input)
         value <<= 1;
     }
     return value;
-}
+}*/
 
 void GlEngine::loadPicture(Picture& ioPicture, bool streamed)
 {
@@ -781,10 +801,10 @@ void GlEngine::startRenderFrame()
 }
 
 void GlEngine::endRenderFrame()
-{ 
+{
   if( getFlag( Engine::debugInfo ) )
   {
-    std::string debugText = StringHelper::format( 0xff, "fps:%d call:%d", _lastFps, _drawCall );
+    std::string debugText = utils::format( 0xff, "fps:%d call:%d", _lastFps, _drawCall );
     _d->fpsText->fill( 0, Rect() );
     _d->debugFont.draw( *_d->fpsText, debugText, Point( 0, 0 ) );
     draw( *_d->fpsText, Point( _srcSize.width() / 2, 2 ) );
@@ -792,7 +812,7 @@ void GlEngine::endRenderFrame()
 
 #ifdef CAESARIA_USE_FRAMEBUFFER
   if( getFlag( Engine::effects ) > 0 )
-  {    
+  {
     _d->fb.draw( _d->effects.effects() );
     _d->fb.draw();
   }
@@ -811,19 +831,60 @@ void GlEngine::endRenderFrame()
   _drawCall = 0;
 }
 
-void GlEngine::draw(const Picture &picture, const int dx, const int dy, Rect* clipRect)
+void GlEngine::initViewport(int index, Size s)
+{
+#ifdef CAESARIA_USE_FRAMEBUFFER
+  _d->viewportSize = s;
+#endif
+}
+
+void GlEngine::setViewport(int, bool render)
+{
+  _d->useViewport = render;
+}
+
+void GlEngine::drawViewport(int, Rect r)
+{
+
+}
+
+void GlEngine::draw(const Picture& picture, const int dx, const int dy, Rect* clipRect)
 {
   const GLuint& aTextureID( picture.textureID() );
   if( aTextureID == 0 )
     return;
 
   _drawCall++;
-  float x0 = (float)( dx+picture.offset().x());
-  float x1 = x0+picture.width();
-  float y0 = (float)(dy-picture.offset().y());
-  float y1 = y0+picture.height();
+
+  const Rect& orect = picture.originRect();
+  Size picSize = orect.size();
+  const Point& offset = picture.offset();
+
+  PointF scale( 1.f, 1.f );
+
+  if( _d->useViewport )
+  {
+    scale = PointF( _d->viewportSize.width() / (float)_srcSize.width(),
+                    _d->viewportSize.height() / (float)_srcSize.height() );
+  }
+
+  float x0 = (float)( dx + offset.x() ) * scale.x();
+  float x1 = x0 + picSize.width() * scale.x();
+  float y0 = (float)(dy - offset.y()) * scale.y();
+  float y1 = y0 + picSize.height() * scale.y();
 
   glBindTexture( GL_TEXTURE_2D, aTextureID);
+  float imageWidth, imageHeight;
+  glGetTexLevelParameterfv(GL_TEXTURE_2D,0,GL_TEXTURE_WIDTH,&imageWidth);
+  glGetTexLevelParameterfv(GL_TEXTURE_2D,0,GL_TEXTURE_HEIGHT,&imageHeight);
+
+  if( imageWidth <= 0 || imageHeight <= 0 )
+    return;
+
+  float ox0 = orect.left() / imageWidth;
+  float oy0 = orect.top() / imageHeight;
+  float ox1 = orect.right() / imageWidth;
+  float oy1 = orect.bottom() / imageHeight;
 #ifdef USE_GLES
   GLfloat vtx1[] = {
     x0, y0,
@@ -854,10 +915,10 @@ void GlEngine::draw(const Picture &picture, const int dx, const int dy, Rect* cl
   glBegin( GL_QUADS );
 
   //Bottom-left vertex (corner)
-  glColor4f( _rmask, _gmask, _bmask, _amask ); glTexCoord2i( 0, 0 ); glVertex2f( x0, y0 );
-  glColor4f( _rmask, _gmask, _bmask, _amask ); glTexCoord2i( 1, 0 ); glVertex2f( x1, y0 );
-  glColor4f( _rmask, _gmask, _bmask, _amask ); glTexCoord2i( 1, 1 ); glVertex2f( x1, y1 );
-  glColor4f( _rmask, _gmask, _bmask, _amask ); glTexCoord2i( 0, 1 ); glVertex2f( x0, y1 );
+  glColor4f( _rmask, _gmask, _bmask, _amask ); glTexCoord2f( ox0, oy0 ); glVertex2f( x0, y0 );
+  glColor4f( _rmask, _gmask, _bmask, _amask ); glTexCoord2f( ox1, oy0 ); glVertex2f( x1, y0 );
+  glColor4f( _rmask, _gmask, _bmask, _amask ); glTexCoord2f( ox1, oy1 ); glVertex2f( x1, y1 );
+  glColor4f( _rmask, _gmask, _bmask, _amask ); glTexCoord2f( ox0, oy1 ); glVertex2f( x0, y1 );
 
   glEnd();
 #endif
@@ -883,7 +944,68 @@ void GlEngine::draw( const Picture &picture, const Point& pos, Rect* clipRect )
 
 void GlEngine::draw(const Picture& picture, const Rect& src, const Rect& dst, Rect* clipRect)
 {
-  int i=0;
+  const GLuint& aTextureID( picture.textureID() );
+  if( aTextureID == 0 )
+    return;
+
+  _drawCall++;
+  const Point& offset = picture.offset();
+
+  float x0 = dst.left() + offset.x();
+  float x1 = dst.right() + offset.x();
+  float y0 = dst.top() - offset.y();
+  float y1 = dst.bottom() - offset.y();
+
+  glBindTexture( GL_TEXTURE_2D, aTextureID);
+
+  float imageWidth, imageHeight;
+  glGetTexLevelParameterfv(GL_TEXTURE_2D,0,GL_TEXTURE_WIDTH,&imageWidth);
+  glGetTexLevelParameterfv(GL_TEXTURE_2D,0,GL_TEXTURE_HEIGHT,&imageHeight);
+
+  if( imageWidth <= 0 || imageHeight <= 0 )
+    return;
+
+  float ox0 = src.left() / imageWidth;
+  float oy0 = src.top() / imageHeight;
+  float ox1 = src.right() / imageWidth;
+  float oy1 = src.bottom() / imageHeight;
+#ifdef USE_GLES
+  GLfloat vtx1[] = {
+    x0, y0,
+    x1, y0,
+    x1, y1,
+    x0, y1
+  };
+
+  GLfloat tex1[] = {
+    0, 0,
+    1, 0,
+    1, 1,
+    0, 1
+  };
+
+  glEnableClientState(GL_VERTEX_ARRAY);
+  glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+
+  glVertexPointer(3, GL_FLOAT, 0, vtx1 );
+  glTexCoordPointer(2, GL_FLOAT, 0, tex1 );
+  glDrawArrays(GL_TRIANGLE_FAN, 0, 4 );
+
+  glDisableClientState(GL_VERTEX_ARRAY);
+  glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+#else
+  // Bind the texture to which subsequent calls refer to
+
+  glBegin( GL_QUADS );
+
+  //Bottom-left vertex (corner)
+  glColor4f( _rmask, _gmask, _bmask, _amask ); glTexCoord2f( ox0, oy0 ); glVertex2f( x0, y0 );
+  glColor4f( _rmask, _gmask, _bmask, _amask ); glTexCoord2f( ox1, oy0 ); glVertex2f( x1, y0 );
+  glColor4f( _rmask, _gmask, _bmask, _amask ); glTexCoord2f( ox1, oy1 ); glVertex2f( x1, y1 );
+  glColor4f( _rmask, _gmask, _bmask, _amask ); glTexCoord2f( ox0, oy1 ); glVertex2f( x0, y1 );
+
+  glEnd();
+#endif
 }
 
 void GlEngine::setColorMask( int rmask, int gmask, int bmask, int amask )

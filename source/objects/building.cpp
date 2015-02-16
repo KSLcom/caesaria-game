@@ -24,7 +24,7 @@
 #include "game/resourcegroup.hpp"
 #include "core/variant.hpp"
 #include "walker/trainee.hpp"
-#include "core/stringhelper.hpp"
+#include "core/utils.hpp"
 #include "city/helper.hpp"
 #include "core/foreach.hpp"
 #include "gfx/tilemap.hpp"
@@ -36,6 +36,7 @@
 
 using namespace constants;
 using namespace gfx;
+using namespace city;
 
 namespace {
 static Renderer::PassQueue buildingPassQueue=Renderer::PassQueue(1,Renderer::overlayAnimation);
@@ -57,7 +58,7 @@ Building::Building(const TileOverlay::Type type, const Size& size )
 {
   setState( Construction::inflammability, 1 );
   setState( Construction::collapsibility, 1 );
-  _d->stateDecreaseInterval = GameDate::days2ticks( 1 );
+  _d->stateDecreaseInterval = game::Date::days2ticks( 1 );
 }
 
 Building::~Building() {}
@@ -68,7 +69,7 @@ void Building::timeStep(const unsigned long time)
 {
   if( time % _d->stateDecreaseInterval == 1 )
   {
-    float popkoeff = std::max<float>( city::Statistic::getBalanceKoeff( _city() ), 0.1f );
+    float popkoeff = std::max<float>( statistic::getBalanceKoeff( _city() ), 0.1f );
     updateState( Construction::damage, popkoeff * state( Construction::collapsibility ) );
     updateState( Construction::fire, popkoeff * state( Construction::inflammability ) );
   }
@@ -76,9 +77,9 @@ void Building::timeStep(const unsigned long time)
   Construction::timeStep(time);
 }
 
-void Building::storeGoods(GoodStock &stock, const int amount)
+void Building::storeGoods(good::Stock &stock, const int amount)
 {
-  std::string bldType = getDebugName();
+  std::string bldType = debugName();
   Logger::warning( "This building should not store any goods %s at [%d,%d]",
                    bldType.c_str(), pos().i(), pos().j() );
   try
@@ -110,14 +111,14 @@ float Building::evaluateService(ServiceWalkerPtr walker)
    return res;
 }
 
-bool Building::build(PlayerCityPtr city, const TilePos &pos)
+bool Building::build( const CityAreaInfo& info )
 {
-  Construction::build( city, pos );
+  Construction::build( info );
 
-  switch( city->climate() )
+  switch( info.city->climate() )
   {
-  case climateNorthen: setState( Construction::inflammability, 0.5 ); break;
-  case climateDesert: setState( Construction::inflammability, 2 ); break;
+  case game::climate::northen: setState( Construction::inflammability, 0.5 ); break;
+  case game::climate::desert: setState( Construction::inflammability, 2 ); break;
   default: break;
   }
 

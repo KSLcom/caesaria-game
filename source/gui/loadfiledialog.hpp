@@ -30,8 +30,8 @@ class LoadFileDialog : public Window
 {
 public:
   LoadFileDialog( Widget* parent, const Rect& rect,
-                 const vfs::Directory& dir, const std::string& ext,
-                 int id );
+                  const vfs::Directory& dir, const std::string& ext,
+                  int id );
   
   virtual ~LoadFileDialog();
 
@@ -42,11 +42,13 @@ public:
   virtual bool isPointInside(const Point& point) const;
 
   void setTitle( const std::string& title );
+  void setText( const std::string& text );
 
   void setMayDelete( bool mayDelete );
+  void setShowExtension( bool  showExtension );
   bool isMayDelete() const;
 
-oc3_signals public:
+signals public:
   Signal1<std::string>& onSelectFile();
 
 protected:

@@ -19,8 +19,10 @@
 #include "city/helper.hpp"
 #include "spear.hpp"
 #include "game/gamedate.hpp"
+#include "walkers_factory.hpp"
 
 using namespace constants;
+REGISTER_SOLDIER_IN_WALKERFACTORY( walker::romeSpearman, walker::romeSpearman, RomeArcher, archer )
 
 RomeArcher::RomeArcher(PlayerCityPtr city, walker::Type type )
   : RomeSoldier( city, type )
@@ -33,7 +35,7 @@ void RomeArcher::_fire( TilePos p )
 {
   SpearPtr spear = Spear::create( _city() );
   spear->toThrow( pos(), p );
-  wait( GameDate::days2ticks( 1 ) / 2 );
+  wait( game::Date::days2ticks( 1 ) / 2 );
 }
 
 RomeArcherPtr RomeArcher::create(PlayerCityPtr city, walker::Type type)
@@ -68,7 +70,7 @@ void RomeArcher::timeStep(const unsigned long time)
     else
     {
       //_check4attack();
-      _setSubAction( patrol );
+      send2patrol();
     }
   }
   break;
@@ -91,9 +93,16 @@ void RomeArcher::timeStep(const unsigned long time)
     else
     {
       //_check4attack();
-      _setSubAction( patrol );
+      send2patrol();
     }
   }
+
+  case Soldier::patrol:
+    if( game::Date::current().day() % 2 == 0 )
+    {
+      _tryAttack();
+    }
+  break;
 
   default: break;
   } // end switch( _d->action )

@@ -21,8 +21,11 @@
 #include "pathway/pathway.hpp"
 #include "objects/market.hpp"
 #include "good/goodstore.hpp"
+#include "walkers_factory.hpp"
 
 using namespace constants;
+
+REGISTER_CLASS_IN_WALKERFACTORY(walker::marketLady, MarketLady)
 
 ServiceWalkerPtr MarketLady::create(PlayerCityPtr city)
 {
@@ -32,7 +35,7 @@ ServiceWalkerPtr MarketLady::create(PlayerCityPtr city)
   return ret;
 }
 
-void MarketLady::_updateThinks()
+void MarketLady::_updateThoughts()
 {
   if( pathway().isReverse() )
   {
@@ -47,7 +50,7 @@ void MarketLady::_updateThinks()
     }
   }
 
-  ServiceWalker::_updateThinks();
+  ServiceWalker::_updateThoughts();
 }
 
 void MarketLady::_centerTile()

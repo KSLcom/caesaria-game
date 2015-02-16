@@ -19,11 +19,11 @@
 #include "core/position.hpp"
 #include "core/exception.hpp"
 #include "game/resourcegroup.hpp"
-#include "gfx/tile.hpp"
+#include "gfx/helper.hpp"
 #include "city/helper.hpp"
 #include "good/goodhelper.hpp"
 #include "city/city.hpp"
-#include "core/stringhelper.hpp"
+#include "core/utils.hpp"
 #include "gfx/tilemap.hpp"
 #include "core/gettext.hpp"
 #include "core/logger.hpp"
@@ -31,14 +31,23 @@
 #include "walker/locust.hpp"
 #include "core/foreach.hpp"
 #include "game/gamedate.hpp"
+#include "gfx/helper.hpp"
+#include "objects_factory.hpp"
 
 using namespace constants;
 using namespace gfx;
 
+REGISTER_CLASS_IN_OVERLAYFACTORY(objects::fig_farm, FarmFruit)
+REGISTER_CLASS_IN_OVERLAYFACTORY(objects::wheat_farm, FarmWheat)
+REGISTER_CLASS_IN_OVERLAYFACTORY(objects::vinard, FarmGrape)
+REGISTER_CLASS_IN_OVERLAYFACTORY(objects::meat_farm, FarmMeat)
+REGISTER_CLASS_IN_OVERLAYFACTORY(objects::olive_farm, FarmOlive)
+REGISTER_CLASS_IN_OVERLAYFACTORY(objects::vegetable_farm, FarmVegetable)
+
 class FarmTile
 {
 public:
-  FarmTile(const Good::Type outGood, const TilePos& pos );
+  FarmTile(const good::Product outGood, const TilePos& pos );
   virtual ~FarmTile();
   void computePicture(const int percent);
   Picture& getPicture();
@@ -49,21 +58,20 @@ private:
   Animation _animation;
 };
 
-FarmTile::FarmTile(const Good::Type outGood, const TilePos& pos )
+FarmTile::FarmTile(const good::Product outGood, const TilePos& pos )
 {
   _pos = pos;
 
   int picIdx = 0;
-  switch (outGood)
+  if(outGood == good::wheat) picIdx = 13;
+  else if(outGood == good::vegetable ) picIdx = 18;
+  else if(outGood == good::fruit )picIdx = 23;
+  else if(outGood == good::olive ) picIdx = 28;
+  else if(outGood == good::grape ) picIdx = 33;
+  else if(outGood == good::meat) picIdx = 38;
+  else
   {
-  case Good::wheat: picIdx = 13; break;
-  case Good::vegetable: picIdx = 18; break;
-  case Good::fruit: picIdx = 23; break;
-  case Good::olive: picIdx = 28; break;
-  case Good::grape: picIdx = 33; break;
-  case Good::meat: picIdx = 38; break;
-  default:
-    Logger::warning( "Unexpected farmType in farm" + GoodHelper::name( outGood ) );
+    Logger::warning( "Unexpected farmType in farm" + good::Helper::name( outGood ) );
     _CAESARIA_DEBUG_BREAK_IF( "Unexpected farmType in farm ");
   }
 
@@ -77,7 +85,7 @@ void FarmTile::computePicture(const int percent)
 
   int picIdx = (percent * (pictures.size()-1)) / 100;
   _picture = pictures[picIdx];
-  _picture.addOffset( TileHelper::tilepos2screen( _pos ));
+  _picture.addOffset( tile::tilepos2screen( _pos ));
 }
 
 Picture& FarmTile::getPicture() {  return _picture; }
@@ -91,11 +99,11 @@ public:
   Picture pictureBuilding;  // we need to change its offset
 };
 
-Farm::Farm(const Good::Type outGood, const Type type )
-  : Factory( Good::none, outGood, type, Size(3) ), _d( new Impl )
+Farm::Farm(const good::Product outGood, const Type type )
+  : Factory( good::none, outGood, type, Size(3) ), _d( new Impl )
 {
   _d->pictureBuilding = Picture::load( ResourceGroup::commerce, 12);  // farm building
-  _d->pictureBuilding.addOffset( 30, 15);
+  _d->pictureBuilding.addOffset( tilemap::cellPicSize().width()/2, tilemap::cellPicSize().height()/2 );
 
   setPicture( _d->pictureBuilding );
   outStockRef().setCapacity( 100 );
@@ -103,18 +111,18 @@ Farm::Farm(const Good::Type outGood, const Type type )
   init();
 }
 
-bool Farm::canBuild(PlayerCityPtr city, TilePos pos, const TilesArray& aroundTiles ) const
+bool Farm::canBuild( const CityAreaInfo& areaInfo ) const
 {
-  bool is_constructible = Construction::canBuild( city, pos, aroundTiles );
+  bool is_constructible = Construction::canBuild( areaInfo );
   bool on_meadow = false;
 
-  TilesArray area = city->tilemap().getArea( pos, size() );
+  TilesArray area = areaInfo.city->tilemap().getArea( areaInfo.pos, size() );
   foreach( tile, area )
   {
     on_meadow |= (*tile)->getFlag( Tile::tlMeadow );
   }
 
-  const_cast< Farm* >( this )->_setError( on_meadow ? _("##farm_need_farmland##") : "" );
+  const_cast< Farm* >( this )->_setError( on_meadow ? "" : _("##farm_need_farmland##") );
 
   return (is_constructible && on_meadow);  
 }
@@ -122,7 +130,7 @@ bool Farm::canBuild(PlayerCityPtr city, TilePos pos, const TilesArray& aroundTil
 
 void Farm::init()
 {
-  Good::Type farmType = produceGoodType();
+  good::Product farmType = produceGoodType();
   // add subTiles in draw order
   _d->subTiles.push_back(FarmTile(farmType, TilePos( 0, 0 ) ));
   _d->subTiles.push_back(FarmTile(farmType, TilePos( 2, 2 ) ));
@@ -166,15 +174,15 @@ void Farm::timeStep(const unsigned long time)
 {
   Factory::timeStep(time);
 
-  if( GameDate::isDayChanged() && mayWork() && progress() < 100 )
+  if( game::Date::isDayChanged() && mayWork() && progress() < 100 )
   {
     computePictures();
   }
 }
 
-bool Farm::build(PlayerCityPtr city, const TilePos& pos)
+bool Farm::build( const CityAreaInfo& info )
 {
-  Factory::build( city, pos );
+  Factory::build( info );
   computePictures();
 
   return true;
@@ -192,14 +200,14 @@ void Farm::load( const VariantMap& stream )
   computePictures();
 }
 
-unsigned int Farm::getProduceQty() const
+unsigned int Farm::produceQty() const
 {
-  return getProductRate() * getFinishedQty() * numberWorkers() / maximumWorkers();
+  return productRate() * getFinishedQty() * numberWorkers() / maximumWorkers();
 }
 
 Farm::~Farm() {}
 
-FarmWheat::FarmWheat() : Farm(Good::wheat, building::wheatFarm)
+FarmWheat::FarmWheat() : Farm(good::wheat, objects::wheat_farm)
 {
 }
 
@@ -216,22 +224,33 @@ std::string FarmWheat::troubleDesc() const
   return Factory::troubleDesc();
 }
 
-FarmOlive::FarmOlive() : Farm(Good::olive, building::oliveFarm)
+bool FarmWheat::build( const CityAreaInfo& info )
+{
+  bool ret = Farm::build( info );
+  if( info.city->climate() == game::climate::central )
+  {
+    setProductRate( productRate() * 2 );
+  }
+
+  return ret;
+}
+
+FarmOlive::FarmOlive() : Farm(good::olive, objects::olive_farm)
 {
 }
 
-FarmGrape::FarmGrape() : Farm(Good::grape, building::grapeFarm)
+FarmGrape::FarmGrape() : Farm(good::grape, objects::vinard)
 {
 }
 
-FarmMeat::FarmMeat() : Farm(Good::meat, building::pigFarm)
+FarmMeat::FarmMeat() : Farm(good::meat, objects::meat_farm)
 {
 }
 
-FarmFruit::FarmFruit() : Farm(Good::fruit, building::fruitFarm)
+FarmFruit::FarmFruit() : Farm(good::fruit, objects::fig_farm)
 {
 }
 
-FarmVegetable::FarmVegetable() : Farm(Good::vegetable, building::vegetableFarm)
+FarmVegetable::FarmVegetable() : Farm(good::vegetable, objects::vegetable_farm)
 {
 }

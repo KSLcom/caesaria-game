@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU General Public License
 // along with CaesarIA.  If not, see <http://www.gnu.org/licenses/>.
 //
-// Copyright 2012-2014 Dalerank, dalerankn8@gmail.com
+// Copyright 2012-2015 Dalerank, dalerankn8@gmail.com
 
 #ifndef __CAESARIA_CITYRENDERER_H_INCLUDED__
 #define __CAESARIA_CITYRENDERER_H_INCLUDED__
@@ -29,15 +29,16 @@ namespace gfx
 {
 
 /* Draws the tilemap area on the screen thanks to the GfxEngine, and handle user events */
-class CityRenderer : public gfx::Renderer
+class CityRenderer : public Renderer
 {
 public:
   CityRenderer();
-  ~CityRenderer();
+  virtual ~CityRenderer();
 
-  void initialize(PlayerCityPtr city, gfx::Engine* engine, gui::Ui *guienv);
+  void initialize(PlayerCityPtr city, Engine* engine, gui::Ui *guienv,
+                  bool oldGraphic=false);
 
-  gfx::Camera* camera();
+  Camera* camera();
 
   // draws the tilemap on the screen,
   // using a dumb back to front drawing of all pictures.
@@ -45,28 +46,25 @@ public:
 
   void handleEvent( NEvent& event);
 
-  gfx::Tilemap& getTilemap();
-
   // sets the current command
   void setMode( Renderer::ModePtr command );
-  Renderer::ModePtr getMode() const;
+  Renderer::ModePtr mode() const;
 
   void animate( unsigned int time );
 
-  void addLayer( LayerPtr layer );
+  void addLayer( layer::LayerPtr layer );
+  layer::LayerPtr currentLayer() const;
+  layer::LayerPtr getLayer(int type) const;
   void setLayer( int layertype );
   int  layerType() const;
 
-  Point getOffset() const;
-
-  TilePos getTilePos( Point point ) const;
-
+  TilePos screen2tilepos( Point point ) const;
   void setViewport( const Size& size );
 
-public oc3_signals:
+public signals:
   Signal1<int>& onLayerSwitch();
 
-public oc3_slots:
+public slots:
   void rotateRight();
   void rotateLeft();
 

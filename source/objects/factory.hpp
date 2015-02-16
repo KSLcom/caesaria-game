@@ -23,24 +23,22 @@
 #include "predefinitions.hpp"
 #include "good/good.hpp"
 
-class GoodStore;
-
 class Factory : public WorkingBuilding
 {
 public:
-  Factory( const Good::Type inGood, const Good::Type outGood,
+  Factory( const good::Product inGood, const good::Product outGood,
            const TileOverlay::Type type, const Size& size );
   virtual ~Factory();
 
-  GoodStock& inStockRef();
-  const GoodStock& inStockRef() const;
+  good::Stock& inStockRef();
+  const good::Stock& inStockRef() const;
 
-  GoodStock& outStockRef();
+  good::Stock& outStockRef();
 
-  Good::Type consumeGoodType() const;
-  Good::Type produceGoodType() const;
+  good::Product consumeGoodType() const;
+  good::Product produceGoodType() const;
 
-  GoodStore& store();
+  good::Store& store();
 
   virtual std::string troubleDesc() const;
 
@@ -63,37 +61,34 @@ public:
   virtual void save( VariantMap& stream) const;
   virtual void load( const VariantMap& stream);
 
-  virtual void productRate( const float rate );
-  virtual float getProductRate() const;
+  virtual void setProductRate( const float rate );
+  virtual float productRate() const;
+  virtual unsigned int effciency() const;
 
   virtual unsigned int getFinishedQty() const;
   virtual unsigned int getConsumeQty() const;
 
   std::string cartStateDesc() const;
+  virtual void initialize(const MetaData &mdata);
 
 protected:
   virtual bool _mayDeliverGood() const;
   virtual void _storeChanged();
   virtual void _removeSpoiledGoods();
+  void _setUnworkingInterval( unsigned int weeks );
+  virtual void _reachUnworkingTreshold();
 
 protected:
   class Impl;
   ScopedPtr< Impl > _d;
 };
 
-class TimberLogger : public Factory
-{
-public:
-  TimberLogger();
-  virtual bool canBuild( PlayerCityPtr city, TilePos pos, const gfx::TilesArray& aroundTiles ) const;  // returns true if it can be built there
-};
-
 class Winery : public Factory
 {
 public:
   Winery();
-  virtual bool canBuild(PlayerCityPtr city, TilePos pos, const gfx::TilesArray& aroundTiles) const;
-  virtual bool build(PlayerCityPtr city, const TilePos &pos);
+  virtual bool canBuild(const CityAreaInfo& areaInfo) const;
+  virtual bool build(const CityAreaInfo &info);
 
 protected:
   virtual void _storeChanged();
@@ -104,8 +99,8 @@ class Creamery : public Factory
 public:
   Creamery();
 
-  virtual bool canBuild(PlayerCityPtr city, TilePos pos, const gfx::TilesArray& aroundTiles) const;
-  virtual bool build(PlayerCityPtr city, const TilePos &pos);
+  virtual bool canBuild( const CityAreaInfo& areaInfo ) const;
+  virtual bool build(const CityAreaInfo &info);
 protected:
   virtual void _storeChanged();
 };

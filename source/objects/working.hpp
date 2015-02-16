@@ -33,6 +33,7 @@ public:
   unsigned int needWorkers() const;
   unsigned int productivity() const;
   unsigned int laborAccessPercent() const;
+  virtual std::string sound() const;
 
   void setWorkers( const unsigned int currentWorkers );
   unsigned int addWorkers( const unsigned int workers );
@@ -59,6 +60,8 @@ public:
   virtual std::string workersProblemDesc() const;
   virtual std::string workersStateDesc() const;
   virtual std::string troubleDesc() const;
+
+  virtual void initialize(const MetaData &mdata);
 
 protected:
   void _setError(const std::string& err);

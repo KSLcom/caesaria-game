@@ -14,7 +14,7 @@
 // along with CaesarIA.  If not, see <http://www.gnu.org/licenses/>.
 //
 // Copyright 2012-2013 Gregoire Athanase, gathanase@gmail.com
-// Copyright 2012-2014 Dalerank, dalerankn8@gmail.com
+// Copyright 2012-2015 Dalerank, dalerankn8@gmail.com
 
 #include "workshop_chariot.hpp"
 
@@ -26,10 +26,13 @@
 #include "game/resourcegroup.hpp"
 #include "city/city.hpp"
 #include "constants.hpp"
+#include "objects_factory.hpp"
 
 using namespace constants;
 
-WorkshopChariot::WorkshopChariot() : TrainingBuilding( building::chariotSchool, Size(3) )
+REGISTER_CLASS_IN_OVERLAYFACTORY(objects::chariotSchool, WorkshopChariot)
+
+WorkshopChariot::WorkshopChariot() : TrainingBuilding( objects::chariotSchool, Size(3) )
 {
   _fgPicturesRef().resize(1);
 }

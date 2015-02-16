@@ -30,16 +30,16 @@ class GoodsUpdater : public Srvc
 {
 public:
   static SrvcPtr create(PlayerCityPtr city);
-  virtual void update( const unsigned int time);
+  virtual void timeStep( const unsigned int time);
   static std::string defaultName();
   virtual bool isDeleted() const;
 
   virtual void load(const VariantMap &stream);
   virtual VariantMap save() const;
-  Good::Type goodType() const;
+  good::Product goodType() const;
 
 private:
-  GoodsUpdater(PlayerCityPtr city);
+  GoodsUpdater( PlayerCityPtr city );
 
   class Impl;
   ScopedPtr<Impl> _d;

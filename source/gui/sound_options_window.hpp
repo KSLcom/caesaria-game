@@ -26,19 +26,22 @@
 namespace gui
 {
 
-class SoundOptionsWindow : public Window
+namespace dialog
+{
+
+class SoundOptions : public Window
 {
 public:
-  SoundOptionsWindow( Widget* parent,
+  SoundOptions( Widget* parent,
                       int gameSound, int ambientSound, int themeSound );
 
   //! Деструктор
-  virtual ~SoundOptionsWindow(void);
+  virtual ~SoundOptions(void);
 
   virtual bool onEvent(const NEvent &event);
 
-public oc3_signals:
-  Signal2<audio::SoundType, int>& onSoundChange();
+public signals:
+  Signal2<audio::SoundType, int >& onSoundChange();
   Signal0<>& onClose();
 
 private:
@@ -47,6 +50,8 @@ private:
   class Impl;
   ScopedPtr< Impl > _d;
 };
+
+}//end namespace dialog
 
 } //end namespace gui
 

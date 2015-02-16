@@ -21,8 +21,9 @@
 #include "core/foreach.hpp"
 #include "city/helper.hpp"
 #include "training.hpp"
-#include "core/stringhelper.hpp"
+#include "core/utils.hpp"
 #include "core/logger.hpp"
+#include "core/variant_map.hpp"
 #include "objects/constants.hpp"
 #include "game/gamedate.hpp"
 #include "walker/helper.hpp"
@@ -128,7 +129,7 @@ std::string EntertainmentBuilding::troubleDesc() const
       int level = traineeValue( *item );
       if( level == 0 )
       {
-        ret = StringHelper::format( 0xff, "##need_trainee_%s##", WalkerHelper::getTypename( *item ).c_str() );
+        ret = utils::format( 0xff, "##need_trainee_%s##", WalkerHelper::getTypename( *item ).c_str() );
         break;
       }
     }

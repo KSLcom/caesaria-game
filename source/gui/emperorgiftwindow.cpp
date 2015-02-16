@@ -24,13 +24,17 @@
 #include "core/saveadapter.hpp"
 #include "core/gettext.hpp"
 #include "widget_helper.hpp"
+#include "core/variant_map.hpp"
 #include "game/gamedate.hpp"
-#include "core/stringhelper.hpp"
+#include "core/utils.hpp"
 
 namespace gui
 {
 
-class EmperorGiftWindow::Impl
+namespace dialog
+{
+
+class EmperorGift::Impl
 {
 public:
   typedef enum { modest, generous, lavish } GiftType;
@@ -39,16 +43,16 @@ public:
   void fillGifts( ListBox* lbx );
   unsigned int getGiftCost( GiftType type, unsigned int money );
 
-public oc3_slots:
-  void sendGift() { oc3_emit sendGiftSignal( wantSend ); }
+public slots:
+  void sendGift() { emit sendGiftSignal( wantSend ); }
   void selectGift( const ListBoxItem& item);
 
-public oc3_signals:
+public signals:
   Signal1<int> sendGiftSignal;
 };
 
-EmperorGiftWindow::EmperorGiftWindow(Widget* p, int money , const DateTime &lastgift)
-  : Window( p, Rect( 0, 0, 1, 1 ), "" ), __INIT_IMPL(EmperorGiftWindow)
+EmperorGift::EmperorGift(Widget* p, int money , const DateTime &lastgift)
+  : Window( p, Rect( 0, 0, 1, 1 ), "" ), __INIT_IMPL(EmperorGift)
 {
   _dfunc()->maxMoney = money;
   _dfunc()->wantSend = 0;
@@ -56,26 +60,22 @@ EmperorGiftWindow::EmperorGiftWindow(Widget* p, int money , const DateTime &last
   setupUI( ":/gui/gift4emperor.gui" );
   setCenter( parent()->center() );
 
-  PushButton* btnSend;
-  PushButton* btnCancel;
-  ListBox* lbxGifts;
-  Label* lbLastGiftDate;
-  GET_WIDGET_FROM_UI( lbLastGiftDate )
-  GET_WIDGET_FROM_UI( lbxGifts )
-  GET_WIDGET_FROM_UI( btnCancel )
-  GET_WIDGET_FROM_UI( btnSend )
+  INIT_WIDGET_FROM_UI( Label*, lbLastGiftDate )
+  INIT_WIDGET_FROM_UI( ListBox*, lbxGifts )
+  INIT_WIDGET_FROM_UI( PushButton*, btnCancel )
+  INIT_WIDGET_FROM_UI( PushButton*, btnSend )
 
   CONNECT( lbxGifts, onItemSelected(), _dfunc().data(), Impl::selectGift );
   CONNECT( btnSend, onClicked(), _dfunc().data(), Impl::sendGift );
-  CONNECT( btnSend, onClicked(), this, EmperorGiftWindow::deleteLater );
-  CONNECT( btnCancel, onClicked(), this, EmperorGiftWindow::deleteLater );
+  CONNECT( btnSend, onClicked(), this, EmperorGift::deleteLater );
+  CONNECT( btnCancel, onClicked(), this, EmperorGift::deleteLater );
 
   _dfunc()->fillGifts( lbxGifts );
 
   if( lbLastGiftDate )
   {
-    int monthsLastGift = lastgift.monthsTo( GameDate::current() );
-    std::string text = StringHelper::format( 0xff, "%s  %d  %s",
+    int monthsLastGift = lastgift.monthsTo( game::Date::current() );
+    std::string text = utils::format( 0xff, "%s  %d  %s",
                                              _("##time_since_last_gift##"),
                                              monthsLastGift,
                                              _("##mo##") );
@@ -83,23 +83,23 @@ EmperorGiftWindow::EmperorGiftWindow(Widget* p, int money , const DateTime &last
   }
 }
 
-EmperorGiftWindow::~EmperorGiftWindow() {}
+EmperorGift::~EmperorGift() {}
 
-Signal1<int>& EmperorGiftWindow::onSendGift() { return _dfunc()->sendGiftSignal; }
+Signal1<int>& EmperorGift::onSendGift() { return _dfunc()->sendGiftSignal; }
 
-void EmperorGiftWindow::Impl::fillGifts(ListBox* lbx)
+void EmperorGift::Impl::fillGifts(ListBox* lbx)
 {
   if( !lbx )
     return;
 
-  VariantMap giftModel = SaveAdapter::load( ":/gifts.model" );
+  VariantMap giftModel = config::load( ":/gifts.model" );
   StringArray gifts = giftModel.get( "items" ).toStringArray();
 
   lbx->setTextAlignment( align::center, align::center );
   for( int k=0; k < 3; k++ )
   {
     int tag = getGiftCost( (GiftType)k, maxMoney );
-    std::string priceStr = StringHelper::format( 0xff, " : %d", tag );
+    std::string priceStr = utils::format( 0xff, " : %d", tag );
     ListBoxItem& item = lbx->addItem( _( gifts.random() ) + priceStr );
     item.setTag( tag );
     item.setTextColor( ListBoxItem::simple, tag < maxMoney ? DefaultColors::black : DefaultColors::grey );
@@ -107,7 +107,7 @@ void EmperorGiftWindow::Impl::fillGifts(ListBox* lbx)
   }
 }
 
-unsigned int EmperorGiftWindow::Impl::getGiftCost(EmperorGiftWindow::Impl::GiftType type, unsigned int money)
+unsigned int EmperorGift::Impl::getGiftCost(EmperorGift::Impl::GiftType type, unsigned int money)
 {
   switch( type )
   {
@@ -119,9 +119,11 @@ unsigned int EmperorGiftWindow::Impl::getGiftCost(EmperorGiftWindow::Impl::GiftT
   return 100;
 }
 
-void EmperorGiftWindow::Impl::selectGift(const ListBoxItem& item)
+void EmperorGift::Impl::selectGift(const ListBoxItem& item)
 {
   wantSend = item.tag();
 }
+
+}//end namespace dialog
 
 }//end namespace gui

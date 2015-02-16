@@ -20,7 +20,7 @@
 #include "filesystem.hpp"
 #include "entries.hpp"
 #include "directory.hpp"
-#include "core/stringhelper.hpp"
+#include "core/utils.hpp"
 
 #ifdef CAESARIA_PLATFORM_WIN
   #include <windows.h>
@@ -94,7 +94,7 @@ void Path::splitToDirPathExt( Path* path,
 
               if ( path )
               {
-                std::string rp = StringHelper::replace( name.substr( 0, i + 1 ), "\\", "/" ) ;   
+                std::string rp = utils::replace( name.substr( 0, i + 1 ), "\\", "/" ) ;   
                 *path = Path( rp );
               }
               return;
@@ -130,7 +130,7 @@ Path Path::removeBeginSlash() const
   if( pathTo.empty() )
       return Path( "" ); 
 
-  wchar_t endsym = *pathTo.begin();
+  char endsym = *pathTo.begin();
   if( endsym == '/' || endsym == '\\' )
       pathTo.erase( 0, 1 );
 
@@ -180,7 +180,7 @@ bool Path::isFolder() const
 
 bool Path::isDirectoryEntry() const
 {
-  const std::string& bn = baseName().toString();
+  std::string bn = baseName().toString();
   return (bn == firstEntry || bn == secondEntry);
 }
 
@@ -208,7 +208,7 @@ std::string Path::suffix() const
 
 Path::Path( const std::string& nPath ) : _d( new Impl )
 {
-  _d->path = StringHelper::replace( nPath, "\\", "/" );
+  _d->path = utils::replace( nPath, "\\", "/" );
   _d->checkRcPrefix();
 }
 
@@ -220,7 +220,7 @@ Path::Path( const Path& nPath ) : _d( new Impl )
 
 Path::Path( const char* nPath ) : _d( new Impl )
 {
-  _d->path = StringHelper::replace( nPath, "\\", "/" );
+  _d->path = utils::replace( nPath, "\\", "/" );
   _d->checkRcPrefix();
 }
 
@@ -244,7 +244,12 @@ std::string Path::removeExtension() const
 
 Path Path::changeExtension( const std::string& newExtension ) const
 {
-  return Path( this->removeExtension() + newExtension );
+  std::string ext = newExtension;
+  if( !ext.empty() )
+  {
+    ext = ( ext[0] == '.' ? ext : ("." + ext) );
+  }
+  return Path( this->removeExtension() + ext );
 }
 
 Path::~Path(){}
@@ -256,7 +261,7 @@ Path Path::absolutePath() const
   char fpath[_MAX_PATH];
 
   p = _fullpath(fpath, _d->path.c_str(), _MAX_PATH);
-  std::string tmp = StringHelper::replace( p, "\\", "/");
+  std::string tmp = utils::replace( p, "\\", "/");
   return tmp;
 #elif defined(CAESARIA_PLATFORM_UNIX) || defined(CAESARIA_PLATFORM_HAIKU)
   char* p=0;
@@ -287,7 +292,7 @@ Path Path::absolutePath() const
 Path Path::flattenFilename( const Path& root ) const
 {
   std::string directory = addEndSlash().toString();
-  directory = StringHelper::replace( directory, "\\", "/" );
+  directory = utils::replace( directory, "\\", "/" );
   
   Directory dir;
   Path subdir;
@@ -340,8 +345,8 @@ Path Path::getRelativePathTo( const Directory& directory ) const
   Path path2(directory.absolutePath());
   StringArray list1, list2;
 
-  list1 = StringHelper::split( path1.toString(), "/\\");
-  list2 = StringHelper::split( path2.toString(), "/\\");
+  list1 = utils::split( path1.toString(), "/\\");
+  list2 = utils::split( path2.toString(), "/\\");
 
   unsigned int i=0;
   unsigned int it1=0;
@@ -375,7 +380,7 @@ Path Path::getRelativePathTo( const Directory& directory ) const
 
   for (; i<list1.size() && i<list2.size() 
 #if defined (CAESARIA_PLATFORM_WIN)
-    && ( StringHelper::isEquale( list1[ it1 ], list2[ it2 ], StringHelper::equaleIgnoreCase ) )
+    && ( utils::isEquale( list1[ it1 ], list2[ it2 ], utils::equaleIgnoreCase ) )
 #elif defined(CAESARIA_PLATFORM_UNIX)
     && ( list1[ it1 ]== list2[ it2 ] )	
 #endif //CAESARIA_PLATFORM_UNIX
@@ -419,7 +424,7 @@ Path Path::baseName(bool keepExtension) const
     // take care to search only after last slash to check only for
     // dots in the filename
     end = toString().find_last_of('.');
-    if( end == std::string::npos || end < lastSlash)
+    if( end == std::string::npos || end == lastSlash)
       end=0;
     else
       end = toString().size()-end;
@@ -472,7 +477,7 @@ char &Path::operator [](const unsigned int index)
 
 bool Path::isMyExtension(const std::string &ext, bool checkCase) const
 {
-  return StringHelper::isEquale( extension(), ext, checkCase ? StringHelper::equaleCase : StringHelper::equaleIgnoreCase );
+  return utils::isEquale( extension(), ext, checkCase ? utils::equaleCase : utils::equaleIgnoreCase );
 }
 
 Path& Path::operator=( const Path& other )
@@ -494,7 +499,7 @@ Path Path::operator +(const Path& other)
 
 Path Path::canonical() const
 {
-  return StringHelper::localeLower( _d->path );
+  return utils::localeLower( _d->path );
 }
 
 } //end namespace vfs

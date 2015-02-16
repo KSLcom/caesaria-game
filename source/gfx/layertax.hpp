@@ -18,12 +18,15 @@
 #ifndef __CAESARIA_LAYERTAX_H_INCLUDED__
 #define __CAESARIA_LAYERTAX_H_INCLUDED__
 
-#include "layer.hpp"
+#include "layerinfo.hpp"
 
 namespace gfx
 {
 
-class LayerTax : public Layer
+namespace layer
+{
+
+class Tax : public Info
 {
 public:
   virtual int type() const;
@@ -32,8 +35,10 @@ public:
   static LayerPtr create( Camera& camera, PlayerCityPtr city );
   virtual void handleEvent(NEvent& event);
 private:
-  LayerTax( Camera& camera, PlayerCityPtr city );
+  Tax( Camera& camera, PlayerCityPtr city );
 };
+
+}
 
 }//end namespace gfx
 

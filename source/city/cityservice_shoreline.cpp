@@ -17,7 +17,7 @@
 #include "city.hpp"
 #include "core/safetycast.hpp"
 #include "core/position.hpp"
-#include "gfx/tile.hpp"
+#include "gfx/helper.hpp"
 #include "gfx/tilemap.hpp"
 #include "core/time.hpp"
 #include "core/foreach.hpp"
@@ -63,7 +63,7 @@ void Shoreline::Impl::checkMap( PlayerCityPtr city )
   }
 }
 
-city::SrvcPtr Shoreline::create(PlayerCityPtr city )
+city::SrvcPtr Shoreline::create( PlayerCityPtr city )
 {
   city::SrvcPtr ret( new Shoreline( city ) );
   ret->drop();
@@ -71,36 +71,36 @@ city::SrvcPtr Shoreline::create(PlayerCityPtr city )
   return ret;
 }
 
-std::string Shoreline::defaultName(){ return "shoreline"; }
+std::string Shoreline::defaultName(){ return CAESARIA_STR_EXT(Shoreline); }
 
 Shoreline::Shoreline( PlayerCityPtr city )
-  : city::Srvc( *city.object(), Shoreline::defaultName() ), _d( new Impl )
+  : city::Srvc( city, Shoreline::defaultName() ), _d( new Impl )
 {
   _d->lastTimeUpdate = 0;  
   _d->nextWaterGarbage = 0;
 }
 
-void Shoreline::update( const unsigned int time )
+void Shoreline::timeStep( const unsigned int time )
 {
-  if( !GameDate::isWeekChanged() )
+  //if( !GameDate::isWeekChanged() )
     return;
 
   if( _d->slTiles.empty() )
   {
-    _d->checkMap( &_city );
+    _d->checkMap( _city() );
   }
 
   if( time > _d->nextWaterGarbage )
   {
-    WaterGarbagePtr wg = WaterGarbage::create( &_city );
-    wg->send2City( _city.borderInfo().boatEntry );
+    WaterGarbagePtr wg = WaterGarbage::create( _city() );
+    wg->send2City( _city()->borderInfo().boatEntry );
 
-    _d->nextWaterGarbage = time + math::random( GameDate::days2ticks( 10 ) );
+    _d->nextWaterGarbage = time + math::random( game::Date::days2ticks( 10 ) );
 
     for( int k=0; k < 20; k++ )
     {
       Tile* t = _d->dwTiles.random();
-      RiverWavePtr rw = RiverWave::create( &_city );
+      RiverWavePtr rw = RiverWave::create( _city() );
       rw->send2City( t->pos() );
     }
   }
@@ -133,7 +133,7 @@ void Shoreline::update( const unsigned int time )
       }
     }
 
-    std::string picName = TileHelper::convId2PicName( picId );
+    std::string picName = imgid::toResource( picId );
     if( picName != tile->picture().name())
     {
       tile->setPicture( picName );

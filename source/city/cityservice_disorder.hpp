@@ -30,14 +30,14 @@ class Disorder : public Srvc
 public:
   static SrvcPtr create( PlayerCityPtr city );
   static std::string defaultName();
-  virtual void update( const unsigned int time );
+  virtual void timeStep( const unsigned int time );
   std::string reason() const;
   unsigned int value() const;
 
   virtual VariantMap save() const;
   virtual void load(const VariantMap &stream);
 private:
-  Disorder( PlayerCityPtr city );
+  Disorder(PlayerCityPtr city);
 
   class Impl;
   ScopedPtr< Impl > _d;

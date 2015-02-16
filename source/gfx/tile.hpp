@@ -35,7 +35,7 @@ class Tile
 {
 public:
   typedef enum { pWellWater=0, pFountainWater, pReservoirWater, pDesirability, pBasicCount } Param;
-  typedef enum { tlRoad=0, tlWater, tlTree, tlMeadow, tlRock, tlBuilding,
+  typedef enum { tlRoad=0, tlWater, tlTree, tlMeadow, tlRock, tlOverlay,
                  tlGarden, tlElevation, tlWall, tlDeepWater, tlRubble,
                  isConstructible, isDestructible, tlRift, tlCoast, tlGrass, clearAll,
                  wasDrawn } Type;
@@ -46,10 +46,10 @@ public:
   // tile coordinates
   int i() const;
   int j() const;
-  const TilePos& pos() const;
-
+  inline const TilePos& pos() const{ return _pos; }
   inline const TilePos& epos() const { return _epos; }
   inline const Point& mappos() const { return _mappos; }
+
   inline const TileOverlayPtr& rov() const { return _overlay; }
   void setEPos( const TilePos& epos );
 
@@ -68,7 +68,7 @@ public:
   void setMasterTile(Tile* master);
   bool isMasterTile() const;
 
-  void changeDirection(constants::Direction newDirection);
+  void changeDirection( Tile* masterTile, constants::Direction newDirection);
 
   bool isFlat() const;  // returns true if the tile is walkable/boatable (for display purpose)
 
@@ -134,18 +134,9 @@ private:
   int _height;
   gfx::Animation _animation;
   TileOverlayPtr _overlay;
-};
 
-class TileHelper
-{
-public:
-  static std::string convId2PicName( const unsigned int imgId );
-  static int convPicName2Id( const std::string &pic_name);
-  static int encode( const Tile& tt );
-  static unsigned int hash( const TilePos& pos );
-  static Point tilepos2screen( const TilePos& pos );
-  static void decode( Tile& tile, const int bitset);
-  static Tile& getInvalid();
+private:
+  Tile( const Tile& base );
 };
 
 }//end namespace gfx

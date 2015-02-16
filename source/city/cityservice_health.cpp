@@ -37,7 +37,7 @@ public:
   unsigned int minHealthLevel;
 };
 
-city::SrvcPtr HealthCare::create(PlayerCityPtr city )
+city::SrvcPtr HealthCare::create( PlayerCityPtr city )
 {
   SrvcPtr ret( new HealthCare( city ) );
   ret->drop();
@@ -50,19 +50,19 @@ std::string HealthCare::defaultName()
   return CAESARIA_STR_EXT(HealthCare);
 }
 
-HealthCare::HealthCare(PlayerCityPtr city )
-  : city::Srvc( *city.object(), "water" ), _d( new Impl )
+HealthCare::HealthCare( PlayerCityPtr city )
+  : Srvc( city, HealthCare::defaultName() ), _d( new Impl )
 {
   _d->minHealthLevel = 0;
   _d->value = 0;
 }
 
-void HealthCare::update( const unsigned int time )
+void HealthCare::timeStep(const unsigned int time )
 {
-  if( GameDate::isMonthChanged() )
+  if( game::Date::isMonthChanged() )
   {
-    Helper helper( &_city );
-    HouseList houses = helper.find<House>( building::house );
+    Helper helper( _city() );
+    HouseList houses = helper.find<House>( objects::house );
 
     _d->value = 0;
     _d->minHealthLevel = 0;
@@ -90,25 +90,25 @@ std::string HealthCare::reason() const
   int lvl = math::clamp<int>( _d->value / (100/maxDescriptionLevel), 0, maxDescriptionLevel-1 );
   std::string mainReason = healthDescription[ lvl ];
 
-  Helper helper( &_city );
-  BuildingList clinics = helper.find<Building>( building::doctor );
+  Helper helper( _city() );
+  BuildingList clinics = helper.find<Building>( objects::clinic );
 
   mainReason += clinics.size() > 0 ? "_clinic##" : "##";
 
   reasons << mainReason;
   if( lvl > maxDescriptionLevel / 3 )
   {
-    int avTypes[] = { building::barber, building::baths, building::doctor, building::hospital, building::unknown };
+    int avTypes[] = { objects::barber, objects::baths, objects::clinic, objects::hospital, objects::unknown };
     std::string avReasons[] = { "##advchief_some_need_barber##", "##advchief_some_need_baths##",
                                 "##advchief_some_need_doctors##", "##advchief_some_need_hospital##",
                                 "" };
 
-    for( int i=0; avTypes[ i ] != building::unknown; i++ )
+    for( int i=0; avTypes[ i ] != objects::unknown; i++ )
     {
       std::set<int> availableTypes;
       availableTypes.insert( avTypes[ i ] );
 
-      HouseList houses = Statistic::getEvolveHouseReadyBy( &_city, availableTypes );
+      HouseList houses = statistic::getEvolveHouseReadyBy( _city(), availableTypes );
       if( houses.size() > 0 )
       {
         reasons << avReasons[i];

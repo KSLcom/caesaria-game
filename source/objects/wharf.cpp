@@ -24,8 +24,11 @@
 #include "good/goodstore.hpp"
 #include "game/gamedate.hpp"
 #include "constants.hpp"
+#include "objects_factory.hpp"
 
 using namespace constants;
+
+REGISTER_CLASS_IN_OVERLAYFACTORY(objects::wharf, Wharf)
 
 class Wharf::Impl
 {
@@ -34,7 +37,7 @@ public:
   FishingBoatPtr boat;
 };
 
-Wharf::Wharf() : CoastalFactory(Good::none, Good::fish, building::wharf, Size(2)), _d( new Impl )
+Wharf::Wharf() : CoastalFactory(good::none, good::fish, objects::wharf, Size(2)), _d( new Impl )
 {
   // transport 52 53 54 55
   setPicture( ResourceGroup::wharf, Impl::northPic );
@@ -57,7 +60,7 @@ void Wharf::timeStep(const unsigned long time)
   CoastalFactory::timeStep(time);
 
   //try get good from storage building for us
-  if( GameDate::isWeekChanged() && numberWorkers() > 0 && walkers().size() == 0 )
+  if( game::Date::isWeekChanged() && numberWorkers() > 0 && walkers().size() == 0 )
   {
     receiveGood();
     deliverGood();
@@ -75,7 +78,7 @@ void Wharf::timeStep(const unsigned long time)
     {
       updateProgress( -100.f );
       //gcc fix for temporaly ref object
-      GoodStock tmpStock( produceGoodType(), 100, 100 );
+      good::Stock tmpStock( produceGoodType(), 100, 100 );
       store().store( tmpStock, 100 );
     }
   }
@@ -119,7 +122,7 @@ std::string Wharf::workersProblemDesc() const
       switch( _d->boat->state() )
       {
       case FishingBoat::catchFish: ret = "##wharf_our_boat_fishing##"; break;
-      case FishingBoat::back2base: ret = _d->boat->getFishQty() > 0
+      case FishingBoat::back2base: ret = _d->boat->fishQty() > 0
                                             ? "##wharf_out_boat_return_with_fish##"
                                             : "##wharf_our_boat_return##";
       break;

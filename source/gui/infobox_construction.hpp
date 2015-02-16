@@ -34,11 +34,20 @@ public:
 
   virtual bool onEvent(const NEvent &event);
 
-  virtual ConstructionPtr getConstruction() const;
-  virtual void setConstruction( ConstructionPtr construction );
+  virtual ConstructionPtr base() const;
+  virtual void setBase( ConstructionPtr base );
+
+protected:
+  void _setWorkingVisible( bool show );
+  void _setWorkingActive( bool working );
+  void _updateWorkingText();
+  void _resolveToggleWorking();
+  PushButton* _btnToggleWorkingRef();
+
 private:
   void _switch( int flag );
   ConstructionPtr _construction;
+  PushButton* _btnToggleWorking;
 };
 
 }

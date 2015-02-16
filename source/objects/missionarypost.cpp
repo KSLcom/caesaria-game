@@ -17,12 +17,16 @@
 
 #include "missionarypost.hpp"
 #include "game/resourcegroup.hpp"
+#include "walker/walker.hpp"
 #include "constants.hpp"
+#include "objects_factory.hpp"
 
 using namespace constants;
 
+REGISTER_CLASS_IN_OVERLAYFACTORY( objects::missionaryPost, MissionaryPost)
+
 MissionaryPost::MissionaryPost()
-  : ServiceBuilding( Service::missionary, building::missionaryPost, Size(2) )
+  : ServiceBuilding( Service::missionary, objects::missionaryPost, Size(2) )
 {
   setMaximumWorkers(20);
   setWorkers( 0 );
@@ -37,6 +41,15 @@ void MissionaryPost::deliverService()
   if( mayWork() )
   {
     ServiceBuilding::deliverService();
+
+    WalkerList ws = walkers();
+    if( !ws.empty() )
+    {
+      if( ws.front()->type() == walker::missioner )
+      {
+        ws.front()->setThinks( "##missioner_high_barbarian_risk##" );
+      }
+    }
   }
 }
 

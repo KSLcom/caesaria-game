@@ -31,6 +31,7 @@
 #include "world/empire.hpp"
 #include "city/city.hpp"
 #include "settings.hpp"
+#include "core/variant_map.hpp"
 #include "events/postpone.hpp"
 #include "gamedate.hpp"
 #include "core/logger.hpp"
@@ -43,28 +44,32 @@
 
 using namespace religion;
 
-namespace {
+namespace game
+{
+
+namespace loader
+{
+
 CAESARIA_LITERALCONST(climate)
 CAESARIA_LITERALCONST(adviserEnabled)
 CAESARIA_LITERALCONST(fishPlaceEnabled)
 static const int currentVesion = 1;
 CAESARIA_LITERALCONST(random)
-}
 
-class GameLoaderMission::Impl
+class Mission::Impl
 {
 public:
   std::string restartFile;
 };
 
-GameLoaderMission::GameLoaderMission()
+Mission::Mission()
  : _d( new Impl )
 {
 }
 
-bool GameLoaderMission::load( const std::string& filename, Game& game )
+bool Mission::load( const std::string& filename, Game& game )
 {
-  VariantMap vm = SaveAdapter::load( filename );
+  VariantMap vm = config::load( filename );
   _d->restartFile = filename;
   
   if( currentVesion == vm[ "version" ].toInt() )
@@ -74,7 +79,7 @@ bool GameLoaderMission::load( const std::string& filename, Game& game )
 
     if( climateType >= 0 )
     {
-      ClimateManager::initialize( (ClimateType)climateType );
+      game::climate::initialize( (ClimateType)climateType );
     }
 
     if( mapToLoad == lc_random )
@@ -88,7 +93,7 @@ bool GameLoaderMission::load( const std::string& filename, Game& game )
     }
     else
     {
-      GameLoader mapLoader;
+      game::Loader mapLoader;
       mapLoader.load( mapToLoad, game );
     }
 
@@ -104,10 +109,10 @@ bool GameLoaderMission::load( const std::string& filename, Game& game )
     city->funds().resolveIssue( FundIssue( city::Funds::donation, vm[ "funds" ].toInt() ) );
 
     Logger::warning( "GameLoaderMission: load city options ");
-    city->setOption( PlayerCity::adviserEnabled, vm.get( lc_adviserEnabled, true ) );
-    city->setOption( PlayerCity::fishPlaceEnabled, vm.get( lc_fishPlaceEnabled, true ) );
+    city->setOption( PlayerCity::adviserEnabled, vm.get( lc_adviserEnabled, 1 ) );
+    city->setOption( PlayerCity::fishPlaceEnabled, vm.get( lc_fishPlaceEnabled, 1 ) );
 
-    GameDate::instance().init( vm[ "date" ].toDateTime() );
+    game::Date::instance().init( vm[ "date" ].toDateTime() );
 
     VariantMap vm_events = vm[ "events" ].toMap();
     foreach( it, vm_events )
@@ -120,14 +125,14 @@ bool GameLoaderMission::load( const std::string& filename, Game& game )
     Logger::warning( "GameLoaderMission: load empire state" );
     game.empire()->load( vm[ "empire" ].toMap() );
 
-    city::VictoryConditions targets;
+    city::VictoryConditions winConditions;
     Variant winOptions = vm[ "win" ];
     Logger::warningIf( winOptions.isNull(), "GameLoaderMission: cannot load mission win options from file " + filename );
 
-    targets.load( winOptions.toMap() );
-    city->setVictoryConditions( targets );
+    winConditions.load( winOptions.toMap() );
+    city->setVictoryConditions( winConditions );
 
-    city::BuildOptions options;
+    city::development::Options options;
     options.load( vm[ "buildoptions" ].toMap() );
     city->setBuildOptions( options  );
 
@@ -142,7 +147,7 @@ bool GameLoaderMission::load( const std::string& filename, Game& game )
 
     std::string missionName = vfs::Path( filename ).baseName( false ).toString();
     Locale::addTranslation( missionName );
-    GameSettings::set( GameSettings::lastTranslation, Variant( missionName ) );
+    SETTINGS_SET_VALUE( lastTranslation, Variant( missionName ) );
 
     //reseting divinities festival date
     DivinityList gods = rome::Pantheon::instance().all();
@@ -157,10 +162,14 @@ bool GameLoaderMission::load( const std::string& filename, Game& game )
   return false;
 }
 
-bool GameLoaderMission::isLoadableFileExtension( const std::string& filename )
+bool Mission::isLoadableFileExtension( const std::string& filename )
 {
   return vfs::Path( filename ).isMyExtension( ".mission" );
 }
 
-int GameLoaderMission::climateType(const std::string& filename) { return -1; }
-std::string GameLoaderMission::restartFile() const { return _d->restartFile; }
+int Mission::climateType(const std::string& filename) { return -1; }
+std::string Mission::restartFile() const { return _d->restartFile; }
+
+}//end namespace loader
+
+}//end namespace game

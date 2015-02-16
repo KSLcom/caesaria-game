@@ -15,11 +15,11 @@
 //
 // Copyright 2012-2014 Dalerank, dalerankn8@gmail.com
 
-
 #include "tileoverlay.hpp"
 #include "objects/metadata.hpp"
 #include "city/city.hpp"
 #include "tilemap.hpp"
+#include "core/variant_map.hpp"
 #include "core/logger.hpp"
 
 namespace gfx
@@ -54,6 +54,10 @@ TileOverlay::TileOverlay(const Type type, const Size& size)
   _d->name = "unknown";
 
   setType( type );
+
+#ifdef DEBUG
+  OverlayDebugQueue::instance().add( this );
+#endif
 }
 
 Desirability TileOverlay::desirability() const
@@ -72,9 +76,9 @@ void TileOverlay::setType(const Type type)
 
 void TileOverlay::timeStep(const unsigned long) {}
 
-void TileOverlay::changeDirection(constants::Direction direction)
+void TileOverlay::changeDirection( Tile* masterTile, constants::Direction direction)
 {
-
+  _d->masterTile = masterTile;
 }
 
 void TileOverlay::setPicture(Picture picture)
@@ -82,18 +86,18 @@ void TileOverlay::setPicture(Picture picture)
   _d->picture = picture;
 }
 
-bool TileOverlay::build( PlayerCityPtr city, const TilePos& pos )
+bool TileOverlay::build(const CityAreaInfo &info)
 {
-  Tilemap &tilemap = city->tilemap();
+  Tilemap &tilemap = info.city->tilemap();
 
-  _d->city = city;
-  _d->masterTile = &tilemap.at( pos );
+  _d->city = info.city;
+  _d->masterTile = &tilemap.at( info.pos );
 
   for (int dj = 0; dj < _d->size.height(); ++dj)
   {
     for (int di = 0; di < _d->size.width(); ++di)
     {
-      Tile& tile = tilemap.at( pos + TilePos( di, dj ) );
+      Tile& tile = tilemap.at( info.pos + TilePos( di, dj ) );
       tile.setMasterTile( _d->masterTile );
 
       if( tile.overlay().isValid() && tile.overlay() != this )
@@ -105,7 +109,7 @@ bool TileOverlay::build( PlayerCityPtr city, const TilePos& pos )
       initTerrain( tile );
     }
   }
-  city->setOption( PlayerCity::updateTiles, 1 );
+  info.city->setOption( PlayerCity::updateTiles, 1 );
 
   return true;
 }
@@ -140,7 +144,7 @@ void TileOverlay::save( VariantMap& stream ) const
   MetaDataHolder& md = MetaDataHolder::instance();
   config.push_back( md.hasData( _d->overlayType )
                       ? Variant( md.getData( _d->overlayType ).name() )
-                      : Variant( getDebugName() ) );
+                      : Variant( debugName() ) );
 
   config.push_back( tile().pos() );
 
@@ -148,6 +152,7 @@ void TileOverlay::save( VariantMap& stream ) const
   stream[ "picture" ] = Variant( _d->picture.name() );
   stream[ "pictureOffset" ] = _d->picture.offset();
   stream[ "size" ] = _d->size;
+  stream[ "height" ] = tile().height();
   stream[ "isDeleted" ] = _d->isDeleted;
   stream[ "name" ] = Variant( _d->name );
 }
@@ -165,11 +170,20 @@ void TileOverlay::load( const VariantMap& stream )
   }
   _d->picture.setOffset( stream.get( "pictureOffset" ).toPoint() );
   _d->isDeleted = stream.get( "isDeleted", false ).toBool();  
+  tile().setHeight( stream.get( "height" ).toInt() );
+}
+
+void TileOverlay::initialize(const MetaData& mdata)
+{
+  if( mdata.picture().isValid() )
+  {
+    setPicture( mdata.picture() );  // default picture for build tool
+  }
 }
 
 bool TileOverlay::isWalkable() const{  return false;}
 bool TileOverlay::isDestructible() const { return true; }
-bool TileOverlay::isFlat() const{  return false;}
+bool TileOverlay::isFlat() const { return false;}
 
 TilePos TileOverlay::pos() const
 {
@@ -207,7 +221,31 @@ Size TileOverlay::size() const{  return _d->size;}
 bool TileOverlay::isDeleted() const{  return _d->isDeleted;}
 Renderer::PassQueue TileOverlay::passQueue() const{ return defaultPassQueue;}
 std::string TileOverlay::name(){  return _d->name;}
-TileOverlay::~TileOverlay(){}  // what we shall to do here?
-TileOverlay::Type TileOverlay::type() const{   return _d->overlayType;}
+TileOverlay::Type TileOverlay::type() const{ return _d->overlayType;}
+
+TileOverlay::~TileOverlay()
+{
+#ifdef DEBUG
+  OverlayDebugQueue::instance().rem( this );
+#endif
+}  // what we shall to do here?
+
+#ifdef DEBUG
+void OverlayDebugQueue::print()
+{
+  OverlayDebugQueue& inst = (OverlayDebugQueue&)instance();
+  if( !inst._pointers.empty() )
+  {
+    Logger::warning( "PRINT OVERLAY DEBUG QUEUE" );
+    foreach( it, inst._pointers )
+    {
+      TileOverlay* ov = (TileOverlay*)*it;
+      Logger::warning( "%s - %s [%d,%d] ref:%d", ov->name().c_str(),
+                                          MetaDataHolder::findTypename( ov->type() ).c_str(),
+                                          ov->pos().i(), ov->pos().j(), ov->rcount() );
+    }
+  }
+}
+#endif
 
 }//end namespace gfx

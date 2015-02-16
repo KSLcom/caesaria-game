@@ -22,15 +22,19 @@
 #include "core/exception.hpp"
 #include "gui/info_box.hpp"
 #include "core/gettext.hpp"
-#include "core/variant.hpp"
+#include "core/variant_map.hpp"
 #include "game/resourcegroup.hpp"
 #include "city/city.hpp"
 #include "constants.hpp"
 #include "walker/lion_tamer.hpp"
 #include "game/gamedate.hpp"
+#include "objects_factory.hpp"
 
 using namespace constants;
 using namespace gfx;
+
+REGISTER_CLASS_IN_OVERLAYFACTORY(objects::gladiatorSchool, GladiatorSchool)
+REGISTER_CLASS_IN_OVERLAYFACTORY(objects::lionsNursery, LionsNursery)
 
 TrainingBuilding::TrainingBuilding(const Type type, const Size& size )
   : WorkingBuilding( type, size )
@@ -42,9 +46,9 @@ void TrainingBuilding::timeStep(const unsigned long time)
 {
    WorkingBuilding::timeStep( time );
 
-   if( _lastSendDate.daysTo( GameDate::current() ) > _trainingDelay )
+   if( _lastSendDate.daysTo( game::Date::current() ) > _trainingDelay )
    {
-     _lastSendDate = GameDate::current();
+     _lastSendDate = game::Date::current();
       deliverTrainee();
    }
 }
@@ -64,7 +68,7 @@ void TrainingBuilding::load( const VariantMap& stream )
 }
 
 
-GladiatorSchool::GladiatorSchool() : TrainingBuilding( building::gladiatorSchool, Size(3))
+GladiatorSchool::GladiatorSchool() : TrainingBuilding( objects::gladiatorSchool, Size(3))
 {
   _fgPicturesRef().resize(1);
 }
@@ -81,7 +85,7 @@ void GladiatorSchool::timeStep(const unsigned long time)
   TrainingBuilding::timeStep( time );
 }
 
-LionsNursery::LionsNursery() : TrainingBuilding( building::lionsNursery, Size(3) )
+LionsNursery::LionsNursery() : TrainingBuilding( objects::lionsNursery, Size(3) )
 {
    _fgPicturesRef().resize(1);
 }

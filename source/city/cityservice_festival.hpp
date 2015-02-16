@@ -30,14 +30,14 @@ namespace city
 class Festival : public Srvc
 {
 public:
-  static SrvcPtr create( PlayerCityPtr city );
+  static SrvcPtr create(PlayerCityPtr city);
   static std::string defaultName();
 
   DateTime lastFestivalDate() const;
   DateTime nextFestivalDate() const;
   void assignFestival( religion::RomeDivinityType name, int size);
 
-  virtual void update( const unsigned int time );
+  virtual void timeStep( const unsigned int time );
 
   virtual VariantMap save() const;
   virtual void load(const VariantMap& stream );

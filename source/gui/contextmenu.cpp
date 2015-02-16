@@ -17,6 +17,7 @@
 #include "contextmenuprivate.hpp"
 #include "contextmenuitem.hpp"
 #include "core/event.hpp"
+#include "core/utils.hpp"
 #include "core/time.hpp"
 #include "core/position.hpp"
 #include "environment.hpp"
@@ -63,6 +64,46 @@ ContextMenu::CloseMode ContextMenu::getCloseHandling() const {  return _d->close
 
 //! Returns amount of menu items
 unsigned int ContextMenu::itemCount() const {  return _d->items.size();}
+
+ContextMenuItem* ContextMenu::addItem( const std::string& path, const std::string& text, int commandId,
+                          bool enabled, bool hasSubMenu,
+                          bool checked, bool autoChecking)
+{
+  StringArray items = utils::split( path, "/" );
+
+  if( items.empty() )
+  {
+    return addItem( text,  commandId, enabled, hasSubMenu, checked, autoChecking );
+  }
+
+  ContextMenuItem* lastItem = findItem( items.front() );
+  if( lastItem == NULL )
+  {
+    lastItem = addItem( items.front(), -1, true, true );
+  }
+
+  items.erase( items.begin() );
+  foreach( it, items )
+  {
+    if( lastItem->subMenu() == NULL )
+    {
+      lastItem = lastItem->addSubMenu()->addItem( *it, -1, true, true );
+    }
+    else
+    {
+      lastItem = lastItem->subMenu()->findItem( *it );
+      if( !lastItem )
+        lastItem = lastItem->addSubMenu()->addItem( *it, -1, true, true );
+    }
+  }
+
+  if( lastItem->subMenu() )
+  {
+    lastItem = lastItem->subMenu()->addItem( text, commandId );
+  }
+
+  return lastItem;
+}
 
 //! Adds a menu item.
 ContextMenuItem* ContextMenu::addItem( const std::string& text, int commandId,
@@ -115,6 +156,19 @@ ContextMenuItem* ContextMenu::findItem( int commandId, unsigned int idxStartSear
     }
   }
   
+  return NULL;
+}
+
+ContextMenuItem* ContextMenu::findItem(const std::string& name) const
+{
+  foreach( it, _d->items )
+  {
+    if ( (*it)->text() == name )
+    {
+      return *it;
+    }
+  }
+
   return NULL;
 }
 
@@ -300,9 +354,10 @@ unsigned int ContextMenu::_sendClick(const Point& p)
 		ContextMenuItem* tItem = selectedItem();
 		if( tItem )
     {
-      oc3_emit tItem->onClicked()();
+      emit tItem->onClicked()();
+      emit tItem->onAction()( tItem->commandId() );
 
-      oc3_emit _d->onItemActionSignal( tItem->commandId() );
+      emit _d->onItemActionSignal( tItem->commandId() );
     }
 		return 1;
 	}
@@ -704,19 +759,8 @@ void ContextMenu::_closeAllSubMenus()
 	//HighLighted = -1;
 }
 
-void ContextMenu::setAllowFocus( bool enabled )
-{
-	_d->allowFocus = enabled;
-}
-
-int ContextMenu::hovered() const
-{
-	return _d->highlihted;
-}
-
-Signal1<int>& ContextMenu::onItemAction()
-{
-  return _d->onItemActionSignal;
-}
+void ContextMenu::setAllowFocus( bool enabled ) {	_d->allowFocus = enabled;}
+int ContextMenu::hovered() const {	return _d->highlihted; }
+Signal1<int>& ContextMenu::onItemAction() {  return _d->onItemActionSignal; }
 
 }//end namespace gui

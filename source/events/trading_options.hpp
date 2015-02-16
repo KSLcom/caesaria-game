@@ -19,11 +19,12 @@
 #define _CAESARIA_EVENT_TRADING_OPTIONS_H_INCLUDE_
 
 #include "event.hpp"
+#include "core/variant_map.hpp"
 
 namespace events
 {
 
-class TradingOptions : public GameEvent
+class ChangeTradingOptions : public GameEvent
 {
 public:
   static GameEventPtr create();

@@ -23,7 +23,7 @@
 #include "city/helper.hpp"
 #include "core/font.hpp"
 #include "core/event.hpp"
-#include "core/stringhelper.hpp"
+#include "core/utils.hpp"
 #include "layerconstants.hpp"
 
 using namespace constants;
@@ -31,7 +31,10 @@ using namespace constants;
 namespace gfx
 {
 
-class LayerDesirability::Impl
+namespace layer
+{
+
+class Desirability::Impl
 {
 public:
   Font debugFont;
@@ -47,9 +50,9 @@ namespace {
   }
 }
 
-int LayerDesirability::type() const {  return citylayer::desirability; }
+int Desirability::type() const {  return citylayer::desirability; }
 
-void LayerDesirability::drawTile( Engine& engine, Tile& tile, const Point& offset)
+void Desirability::drawTile( Engine& engine, Tile& tile, const Point& offset)
 {
   //Tilemap& tilemap = _city->getTilemap();
   Point screenPos = tile.mappos() + offset;
@@ -73,29 +76,15 @@ void LayerDesirability::drawTile( Engine& engine, Tile& tile, const Point& offse
   else
   {
     TileOverlayPtr overlay = tile.overlay();
-    switch( overlay->type() )
+    if( _isVisibleObject( overlay->type() ) )
     {
-    // Base set of visible objects
-    case construction::road:
-    case construction::plaza:
-    case construction::garden:
-
-    case building::burnedRuins:
-    case building::collapsedRuins:
-
-    case building::lowBridge:
-    case building::highBridge:
-
-    case building::elevation:
-    case building::rift:
-
+      // Base set of visible objects
       Layer::drawTile( engine, tile, offset );
       registerTileForRendering( tile );
-    break;
-
-    //other buildings
-    default:
+    }
+    else
     {
+      //other buildings
       int picOffset = __des2index( desirability );
       Picture& pic = Picture::load( ResourceGroup::land2a, 37 + picOffset );
 
@@ -107,30 +96,28 @@ void LayerDesirability::drawTile( Engine& engine, Tile& tile, const Point& offse
         engine.draw( pic, (*tile)->mappos() + offset );
       }
     }
-    break;
-    }
   }
 
   if( desirability != 0 )
   {
-    Picture* tx = _d->debugFont.once( StringHelper::format( 0xff, "%d", desirability) );
+    Picture* tx = _d->debugFont.once( utils::format( 0xff, "%d", desirability) );
     _d->debugText.push_back( tx );
 
-    engine.draw( *tx, screenPos + Point( 20, -15 ) );
+    _addPicture( screenPos + Point( 20, -15 ), *tx );
   }
 
   tile.setWasDrawn();
 }
 
-void LayerDesirability::beforeRender( Engine& engine )
+void Desirability::beforeRender( Engine& engine )
 {
   foreach( it, _d->debugText ) { Picture::destroy( *it ); }
   _d->debugText.clear();
 
-  Layer::beforeRender( engine );
+  Info::beforeRender( engine );
 }
 
-void LayerDesirability::handleEvent(NEvent& event)
+void Desirability::handleEvent(NEvent& event)
 {
   if( event.EventType == sEventMouse )
   {
@@ -160,18 +147,21 @@ void LayerDesirability::handleEvent(NEvent& event)
   Layer::handleEvent( event );
 }
 
-LayerPtr LayerDesirability::create( Camera& camera, PlayerCityPtr city)
+LayerPtr Desirability::create( Camera& camera, PlayerCityPtr city)
 {
-  LayerPtr ret( new LayerDesirability( camera, city ) );
+  LayerPtr ret( new Desirability( camera, city ) );
   ret->drop();
 
   return ret;
 }
 
-LayerDesirability::LayerDesirability( Camera& camera, PlayerCityPtr city)
-  : Layer( &camera, city ), _d( new Impl )
+Desirability::Desirability( Camera& camera, PlayerCityPtr city)
+  : Info( camera, city, 0 ), _d( new Impl )
 {
   _d->debugFont = Font::create( "FONT_1" );
+  _fillVisibleObjects( type() );
+}
+
 }
 
 }//end namespace gfx

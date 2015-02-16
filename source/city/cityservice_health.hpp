@@ -31,9 +31,10 @@ public:
   static city::SrvcPtr create( PlayerCityPtr city );
   static std::string defaultName();
 
-  virtual void update( const unsigned int time );
+  virtual void timeStep( const unsigned int time );
   unsigned int value() const;
   std::string reason() const;
+
 private:
   HealthCare( PlayerCityPtr city );
 

@@ -26,19 +26,22 @@ namespace city
 class Peace : public city::Srvc
 {
 public:
-  static city::SrvcPtr create( PlayerCityPtr city );
+  typedef enum { rskNone, rskRiots } Risk;
+  static city::SrvcPtr create(PlayerCityPtr city);
 
-  virtual void update( const unsigned int time );
-  void addProtestor();
-  void addRioter();
-  void buildingDestroyed( gfx::TileOverlayPtr overlay );
+  virtual void timeStep( const unsigned int time );
+  void addCriminal( WalkerPtr wlk );
+
+  void buildingDestroyed( gfx::TileOverlayPtr overlay, int why );
+
   int value() const;
-  static std::string getDefaultName();
+  static std::string defaultName();
+  std::string reason() const;
 
   virtual VariantMap save() const;
   virtual void load(const VariantMap& stream);
 private:
-  Peace( PlayerCityPtr city );
+  Peace(PlayerCityPtr city);
 
   class Impl;
   ScopedPtr< Impl > _d;

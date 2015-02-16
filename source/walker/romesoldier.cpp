@@ -25,16 +25,24 @@
 #include "gfx/tilemap.hpp"
 #include "animals.hpp"
 #include "core/logger.hpp"
+#include "core/variant_map.hpp"
 #include "helper.hpp"
 #include "enemysoldier.hpp"
 #include "core/foreach.hpp"
 #include "game/gamedate.hpp"
+#include "animals.hpp"
+#include "walkers_factory.hpp"
 
 using namespace constants;
 using namespace gfx;
 
+REGISTER_SOLDIER_IN_WALKERFACTORY( walker::legionary, walker::legionary, RomeSoldier, legionary )
+
 namespace  {
 static const int maxDistanceFromBase = 32;
+enum {
+  expedition=Soldier::userAction+1
+ };
 }
 
 class RomeSoldier::Impl
@@ -43,6 +51,7 @@ public:
   TilePos basePos;
   TilePos patrolPosition;
   double strikeForce, resistance;
+  std::string expedition;
 };
 
 RomeSoldier::RomeSoldier( PlayerCityPtr city, walker::Type type )
@@ -79,7 +88,7 @@ void RomeSoldier::timeStep(const unsigned long time)
 {
   Soldier::timeStep( time );
 
-  if( GameDate::isMonthChanged() )
+  if( game::Date::isMonthChanged() )
   {
     unsigned int dst2base = pos().distanceFrom( _d->basePos );
     if( dst2base > maxDistanceFromBase )
@@ -107,13 +116,15 @@ void RomeSoldier::timeStep(const unsigned long time)
     }
     else
     {
-      _tryAttack();
+      bool haveEnemy = _tryAttack();
+      if( !haveEnemy )
+        send2patrol();
     }
   }
   break;
 
   case patrol:
-    if( GameDate::current().day() % 2 == 0 )
+    if( game::Date::current().day() % 2 == 0 )
     {
       _tryAttack();
     }
@@ -160,6 +171,73 @@ void RomeSoldier::load(const VariantMap& stream)
   }
 }
 
+std::string RomeSoldier::thoughts(Thought th) const
+{
+  if( th == thCurrent )
+  {
+    city::Helper helper( _city() );
+
+    TilePos offset( 10, 10 );
+    EnemySoldierList enemies = helper.find<EnemySoldier>( walker::any, pos() - offset, pos() + offset );
+    if( enemies.empty() )
+    {
+      return Soldier::thoughts( th );
+    }
+    else
+    {
+      RomeSoldierList ourSoldiers = helper.find<RomeSoldier>( walker::any, pos() - offset, pos() + offset );
+      int enemyStrength = 0;
+      int ourStrength = 0;
+
+      foreach( it, enemies) { enemyStrength += (*it)->strike(); }
+      foreach( it, ourSoldiers ) { ourStrength += (*it)->strike(); }
+
+      if( ourStrength > enemyStrength )
+      {
+        int diff = enemyStrength > 0 ? ourStrength / enemyStrength : 99;
+        switch( diff )
+        {
+        case 1: return "";
+
+        case 4: return "##enemies_very_easy##";
+
+        default: break;
+        }
+      }
+      else
+      {
+        int diff = ourStrength > 0 ? enemyStrength / ourStrength : 99;
+        switch( diff )
+        {
+        case 1:
+
+        case 3: return "##enemies_hard_to_me##";
+        case 4: return "##enemies_very_hard##";
+
+        default: break;
+        }
+      }
+
+      Logger::warning( "RomeSoldier: current thinks unknown state" );
+      return "##enemies_unknown_state##";
+    }
+  }
+
+  return "";
+}
+
+TilePos RomeSoldier::places(Walker::Place type) const
+{
+  switch( type )
+  {
+  case plOrigin: return _d->basePos;
+  case plDestination: return _d->patrolPosition;
+  default: break;
+  }
+
+  return Soldier::places( type );
+}
+
 RomeSoldier::~RomeSoldier(){}
 
 WalkerList RomeSoldier::_findEnemiesInRange( unsigned int range )
@@ -170,16 +248,17 @@ WalkerList RomeSoldier::_findEnemiesInRange( unsigned int range )
   TilePos offset( range, range );
   TilesArray tiles = tmap.getArea( pos() - offset, pos() + offset );
 
+  FortPtr fort = base();
+  bool attackAnimals = fort.isValid() ? fort->isAttackAnimals() : false;
+
   foreach( tile, tiles )
   {
-    WalkerList tileWalkers = _city()->walkers( walker::any, (*tile)->pos() );
+    WalkerList tileWalkers = _city()->walkers( (*tile)->pos() );
 
     foreach( w, tileWalkers )
     {
-      if( is_kind_of<EnemySoldier>( *w ) )
-      {
-        walkers.push_back( *w );
-      }
+      if( (*w)->agressive() > 0 )  { walkers << *w; }
+      else if( attackAnimals && is_kind_of<Animal>( *w ) ) { walkers << *w; }
     }
   }
 
@@ -290,12 +369,20 @@ void RomeSoldier::_reachedPathway()
 {
   Soldier::_reachedPathway();
 
-  switch( _subAction() )
+  switch( (int)_subAction() )
   {
+
+  case expedition:
+    deleteLater();
+  break;
 
   case go2position:
   {
-    if( _city()->walkers( type(), pos() ).size() != 1 ) //only me in this tile
+    city::Helper helper( _city() );
+    WalkerList walkersOnTile = helper.find<Walker>( type(), pos() );
+    walkersOnTile.remove( this );
+
+    if( walkersOnTile.size() > 0 ) //only me in this tile
     {
       _back2base();
     }
@@ -370,5 +457,19 @@ void RomeSoldier::send2city(FortPtr base, TilePos pos )
   if( !isDeleted() )
   {
     _city()->addWalker( this );
+  }
+}
+
+void RomeSoldier::send2expedition(const std::string& name)
+{
+  _d->expedition = name;
+  TilePos cityEnter = _city()->borderInfo().roadEntry;
+
+  Pathway way = PathwayHelper::create( pos(), cityEnter, PathwayHelper::allTerrain );
+  if( way.isValid() )
+  {
+    setPathway( way );
+    _setSubAction( (SldrAction)expedition );
+    go();
   }
 }

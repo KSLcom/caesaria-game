@@ -144,12 +144,13 @@ public:
   virtual int selected();
 
   virtual void beforeDraw( gfx::Engine& painter );
+  virtual void refresh();
 
   virtual void setItemTextOffset(Point p);
 
   virtual void setupUI(const VariantMap &ui);
 
-oc3_signals public:
+signals public:
   Signal1<std::string>& onItemSelectedAgain();
   Signal1<const ListBoxItem&>& onItemSelected();
 

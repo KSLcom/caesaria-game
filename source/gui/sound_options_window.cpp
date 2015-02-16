@@ -20,14 +20,18 @@
 #include "core/event.hpp"
 #include "label.hpp"
 #include "widget_helper.hpp"
-#include "core/stringhelper.hpp"
+#include "core/utils.hpp"
 #include "sound/constants.hpp"
 #include "core/logger.hpp"
+#include "widgetescapecloser.hpp"
 
 namespace gui
 {
 
-class SoundOptionsWindow::Impl
+namespace dialog
+{
+
+class SoundOptions::Impl
 {
 public:
   GameAutoPause locker;
@@ -41,12 +45,12 @@ public:
 
   Sounds current, save;
 
-public oc3_signals:
+public signals:
   Signal2<audio::SoundType, int> onSoundChangeSignal;
   Signal0<> onCloseSignal;
 };
 
-SoundOptionsWindow::SoundOptionsWindow(Widget* parent, int gameSound, int ambientSound, int themeSound )
+SoundOptions::SoundOptions(Widget* parent, int gameSound, int ambientSound, int themeSound )
   : Window( parent, Rect( 0, 0, 1, 1 ), "" ), _d( new Impl )
 {
   _d->locker.activate();
@@ -59,11 +63,15 @@ SoundOptionsWindow::SoundOptionsWindow(Widget* parent, int gameSound, int ambien
   _d->current = tmp;
 
   _update();
+  WidgetEscapeCloser::insertTo( this );
+
+  INIT_WIDGET_FROM_UI( PushButton*, btnOk )
+  if( btnOk ) btnOk->setFocus();
 }
 
-SoundOptionsWindow::~SoundOptionsWindow( void ) {}
+SoundOptions::~SoundOptions( void ) {}
 
-bool SoundOptionsWindow::onEvent(const NEvent& event)
+bool SoundOptions::onEvent(const NEvent& event)
 {
   if( event.EventType == sEventGui && event.gui.type == guiButtonClicked )
   {
@@ -75,16 +83,16 @@ bool SoundOptionsWindow::onEvent(const NEvent& event)
     case 21: case 22: _d->current.theme += (id == 21 ? -10 : +10 );   _update(); break;
 
     case 1001:
-      oc3_emit _d->onCloseSignal();
+      emit _d->onCloseSignal();
       deleteLater();
     break;
 
     case 1002:
     {
-      oc3_emit _d->onSoundChangeSignal( audio::gameSound, _d->save.game );
-      oc3_emit _d->onSoundChangeSignal( audio::ambientSound, _d->save.ambient );
-      oc3_emit _d->onSoundChangeSignal( audio::themeSound, _d->save.theme );
-      oc3_emit _d->onCloseSignal();
+      emit _d->onSoundChangeSignal( audio::gameSound, _d->save.game );
+      emit _d->onSoundChangeSignal( audio::ambientSound, _d->save.ambient );
+      emit _d->onSoundChangeSignal( audio::themeSound, _d->save.theme );
+      emit _d->onCloseSignal();
       deleteLater();
     }
     break;
@@ -97,30 +105,28 @@ bool SoundOptionsWindow::onEvent(const NEvent& event)
   return Widget::onEvent( event );
 }
 
-Signal2<audio::SoundType, int>&SoundOptionsWindow::onSoundChange() {  return _d->onSoundChangeSignal;}
-Signal0<>&SoundOptionsWindow::onClose(){  return _d->onCloseSignal;}
+Signal2<audio::SoundType, int>& SoundOptions::onSoundChange() {  return _d->onSoundChangeSignal;}
+Signal0<>& SoundOptions::onClose(){  return _d->onCloseSignal;}
 
-void SoundOptionsWindow::_update()
+void SoundOptions::_update()
 {
-  Label* lbGameSoundPercent;
-  Label* lbAmbientSoundPercent;
-  Label* lbThemeSoundPercent;
-
-  GET_WIDGET_FROM_UI( lbGameSoundPercent )
-  GET_WIDGET_FROM_UI( lbAmbientSoundPercent )
-  GET_WIDGET_FROM_UI( lbThemeSoundPercent )
+  INIT_WIDGET_FROM_UI( Label*, lbGameSoundPercent )
+  INIT_WIDGET_FROM_UI( Label*, lbAmbientSoundPercent )
+  INIT_WIDGET_FROM_UI( Label*, lbThemeSoundPercent )
 
   _d->current.game = math::clamp( _d->current.game, 0, 100 );
   _d->current.ambient = math::clamp( _d->current.ambient, 0, 100 );
   _d->current.theme = math::clamp( _d->current.theme, 0, 100 );
 
-  if( lbGameSoundPercent ) { lbGameSoundPercent->setText( StringHelper::format( 0xff, "%d%%", _d->current.game ) ); }
-  if( lbAmbientSoundPercent ) { lbAmbientSoundPercent->setText( StringHelper::format( 0xff, "%d%%", _d->current.ambient ) ); }
-  if( lbThemeSoundPercent ) { lbThemeSoundPercent->setText( StringHelper::format( 0xff, "%d%%", _d->current.theme ) ); }
+  if( lbGameSoundPercent ) { lbGameSoundPercent->setText( utils::format( 0xff, "%d%%", _d->current.game ) ); }
+  if( lbAmbientSoundPercent ) { lbAmbientSoundPercent->setText( utils::format( 0xff, "%d%%", _d->current.ambient ) ); }
+  if( lbThemeSoundPercent ) { lbThemeSoundPercent->setText( utils::format( 0xff, "%d%%", _d->current.theme ) ); }
 
-  oc3_emit _d->onSoundChangeSignal( audio::gameSound,_d->current.game );
-  oc3_emit _d->onSoundChangeSignal( audio::ambientSound, _d->current.ambient );
-  oc3_emit _d->onSoundChangeSignal( audio::themeSound,_d->current.theme );
+  emit _d->onSoundChangeSignal( audio::gameSound,_d->current.game );
+  emit _d->onSoundChangeSignal( audio::ambientSound, _d->current.ambient );
+  emit _d->onSoundChangeSignal( audio::themeSound,_d->current.theme );
 }
+
+}//end namespace dialog
 
 }//end namespace gui

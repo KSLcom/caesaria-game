@@ -15,8 +15,8 @@
 //
 // Copyright 2012-2014 Dalerank, dalerankn8@gmail.com
 
-#ifndef __CAESARIA_RELIGION_BIULDING_H_INCLUDED__
-#define __CAESARIA_RELIGION_BIULDING_H_INCLUDED__
+#ifndef __CAESARIA_RELIGION_BUILDING_H_INCLUDED__
+#define __CAESARIA_RELIGION_BUILDING_H_INCLUDED__
 
 #include "service.hpp"
 #include "religion/romedivinity.hpp"
@@ -54,7 +54,7 @@ protected:
   BigTemple( religion::DivinityPtr divinity, TileOverlay::Type type, int imgId );
   virtual unsigned int parishionerNumber() const;
 
-  virtual bool build(PlayerCityPtr city, const TilePos &pos);
+  virtual bool build(const CityAreaInfo &info);
 };
 
 class TempleCeres : public SmallTemple
@@ -111,10 +111,10 @@ public:
   BigTempleVenus();
 };
 
-class BigTempleMercure : public BigTemple
+class BigTempleMercury : public BigTemple
 {
 public:
-  BigTempleMercure();
+  BigTempleMercury();
 };
 
 class TempleOracle : public BigTemple
@@ -123,7 +123,7 @@ public:
   TempleOracle();
   virtual unsigned int parishionerNumber() const;
 
-  virtual bool build(PlayerCityPtr city, const TilePos &pos);
+  virtual bool build(const CityAreaInfo &info);
 };
 
 

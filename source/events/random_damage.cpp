@@ -21,9 +21,11 @@
 #include "game/gamedate.hpp"
 #include "objects/road.hpp"
 #include "objects/house.hpp"
+#include "core/variant_map.hpp"
 #include "events/dispatcher.hpp"
 #include "core/logger.hpp"
 #include "core/priorities.hpp"
+#include "factory.hpp"
 
 using namespace constants;
 
@@ -33,6 +35,8 @@ namespace events
 namespace {
 CAESARIA_LITERALCONST(population)
 }
+
+REGISTER_EVENT_IN_FACTORY(RandomDamage, "random_collapse")
 
 class RandomDamage::Impl
 {
@@ -60,14 +64,14 @@ void RandomDamage::_exec( Game& game, unsigned int time )
     _d->isDeleted = true;
 
     Priorities<int> exclude;
-    exclude << building::waterGroup
-            << building::roadGroup
-            << building::disasterGroup;
+    exclude << objects::waterGroup
+            << objects::roadGroup
+            << objects::disasterGroup;
 
     ConstructionList ctrs;
     ctrs << game.city()->overlays();
 
-    if( _d->priority != construction::unknown )
+    if( _d->priority != objects::unknown )
     {
       for( ConstructionList::iterator it=ctrs.begin(); it != ctrs.end(); )
       {
@@ -89,7 +93,8 @@ void RandomDamage::_exec( Game& game, unsigned int time )
     for( unsigned int k=0; k < number4burn; k++ )
     {
       ConstructionPtr building = ctrs.random();
-      building->collapse();
+      if( building.isValid() && !building->isDeleted() )
+        building->collapse();
     }
   }
 }
@@ -123,6 +128,10 @@ VariantMap RandomDamage::save() const
 RandomDamage::RandomDamage() : _d( new Impl )
 {
   _d->isDeleted = false;
+  _d->minPopulation = 0;
+  _d->maxPopulation = 9999;
+  _d->strong = 25;
+  _d->priority = 0;
 }
 
 }//end namespace events

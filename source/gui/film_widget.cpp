@@ -18,7 +18,7 @@
 #include "film_widget.hpp"
 #include "pushbutton.hpp"
 #include "core/event.hpp"
-#include "core/stringhelper.hpp"
+#include "core/utils.hpp"
 #include "core/foreach.hpp"
 #include "texturedbutton.hpp"
 #include "label.hpp"
@@ -42,7 +42,7 @@ public:
   SmkViewer* smkViewer;
   vfs::Path videoFile;
 
-public oc3_signals:
+public signals:
   Signal0<> onCloseSignal;
 };
 
@@ -67,7 +67,7 @@ FilmWidget::FilmWidget(Widget* parent, const vfs::Path& film )
 
   _d->smkViewer->setFilename( _d->videoFile );
 
-  CONNECT( _d->btnExit, onClicked(), &_d->onCloseSignal, Signal0<>::emit );
+  CONNECT( _d->btnExit, onClicked(), &_d->onCloseSignal, Signal0<>::_emit );
   CONNECT( _d->btnExit, onClicked(), this, FilmWidget::deleteLater );
 }
 
@@ -90,7 +90,7 @@ void FilmWidget::setTitle(std::string text)
 
 void FilmWidget::setTime(DateTime time)
 {
-  if( _d->lbTime ) _d->lbTime->setText( StringHelper::format( 0xff, "%s %d %s",
+  if( _d->lbTime ) _d->lbTime->setText( utils::format( 0xff, "%s %d %s",
                                                               DateTime::getMonthName( time.month() ),
                                                               time.year(),
                                                               time.year() < 0 ? "BC" : "AD" ) );

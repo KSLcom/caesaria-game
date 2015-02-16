@@ -19,10 +19,11 @@
 #ifndef _CAESARIA_SOLDIER_INCLUDE_H_
 #define _CAESARIA_SOLDIER_INCLUDE_H_
 
-#include "walker.hpp"
+#include "human.hpp"
+#include "walkers_factory_creator.hpp"
 
 /** Soldier, friend or enemy */
-class Soldier : public Walker
+class Soldier : public Human
 {
 public:
   typedef enum { check4attack=0,
@@ -33,7 +34,8 @@ public:
                  back2base,
                  duckout,
                  patrol,
-                 doNothing } SldrAction;
+                 userAction,
+                 doNothing=0xff } SldrAction;
 
   virtual ~Soldier();
 
@@ -56,6 +58,10 @@ public:
 
   virtual unsigned int attackDistance() const;
   virtual void setAttackDistance( unsigned int distance );
+  virtual bool isFriendTo( WalkerPtr wlk ) const;
+  virtual void setTarget( TilePos location );
+  TilePos target() const;
+  void addFriend( constants::walker::Type friendType);
 
 protected:
   Soldier(PlayerCityPtr city, constants::walker::Type type);
@@ -71,5 +77,19 @@ private:
   __DECLARE_IMPL(Soldier)
 };
 
+template< class T >
+class SoldierCreator : public WalkerCreator
+{
+public:
+  WalkerPtr create( PlayerCityPtr city ) { return T::create( city, rtype ).object();  }
+  SoldierCreator( const constants::walker::Type type ) { rtype = type;  }
+  constants::walker::Type rtype;
+};
+
+#define REGISTER_SOLDIER_IN_WALKERFACTORY(type,rtype,rclass,ctorname) \
+namespace { \
+struct Registrator_##ctorname { Registrator_##ctorname() { WalkerManager::instance().addCreator( type, new SoldierCreator<rclass>( rtype ) ); }}; \
+static Registrator_##ctorname rtor_##ctorname; \
+}
 
 #endif //_CAESARIA_SOLDIER_INCLUDE_H_

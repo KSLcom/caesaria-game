@@ -37,9 +37,10 @@ namespace gui
 namespace infobox
 {
 
-AboutFontain::AboutFontain(Widget* parent, const Tile& tile)
+AboutFontain::AboutFontain(Widget* parent, PlayerCityPtr city, const Tile& tile)
   : AboutConstruction( parent, Rect( 0, 0, 480, 320 ), Rect( 0, 0, 1, 1 ) )
 {
+  setupUI( ":/gui/infoboxfountain.gui" );
   setTitle( _("##fountain##") );
 
   _lbTextRef()->setGeometry( Rect( 25, 45, width() - 25, height() - 55 ) );
@@ -48,7 +49,7 @@ AboutFontain::AboutFontain(Widget* parent, const Tile& tile)
   FountainPtr fountain;
   fountain << tile.overlay();
 
-  setConstruction( ptr_cast<Construction>( fountain ) );
+  setBase( ptr_cast<Construction>( fountain ) );
 
   std::string text;
   if( fountain.isValid() )
@@ -76,12 +77,12 @@ AboutFontain::AboutFontain(Widget* parent, const Tile& tile)
 
 AboutFontain::~AboutFontain(){}
 
-void AboutFontain::showDescription()
+void AboutFontain::_showHelp()
 {
-  DictionaryWindow::show( parent(), building::fountain );
+  DictionaryWindow::show( parent(), objects::fountain );
 }
 
-AboutReservoir::AboutReservoir(Widget* parent, const Tile& tile)
+AboutReservoir::AboutReservoir(Widget* parent, PlayerCityPtr city, const Tile& tile)
   : AboutConstruction( parent, Rect( 0, 0, 480, 320 ), Rect( 0, 0, 1, 1 ) )
 {
   setTitle( _("##reservoir##") );
@@ -90,7 +91,7 @@ AboutReservoir::AboutReservoir(Widget* parent, const Tile& tile)
   _lbTextRef()->setWordwrap( true );
 
   ReservoirPtr reservoir = ptr_cast<Reservoir>( tile.overlay() );
-  setConstruction( ptr_cast<Construction>( reservoir ) );
+  setBase( ptr_cast<Construction>( reservoir ) );
 
   std::string text;
   if( reservoir.isValid() )
@@ -105,12 +106,12 @@ AboutReservoir::AboutReservoir(Widget* parent, const Tile& tile)
 
 AboutReservoir::~AboutReservoir() {}
 
-void AboutReservoir::showDescription()
+void AboutReservoir::_showHelp()
 {
-  DictionaryWindow::show( parent(), building::reservoir );
+  DictionaryWindow::show( parent(), objects::reservoir );
 }
 
-AboutWell::AboutWell(Widget* parent, const Tile& tile)
+AboutWell::AboutWell(Widget* parent, PlayerCityPtr city, const Tile& tile)
   : AboutConstruction( parent, Rect( 0, 0, 480, 320 ), Rect() )
 {
   setTitle( _("##well##") );
@@ -119,7 +120,7 @@ AboutWell::AboutWell(Widget* parent, const Tile& tile)
   _lbTextRef()->setWordwrap( true );
 
   WellPtr well = ptr_cast<Well>( tile.overlay() );
-  setConstruction( ptr_cast<Construction>( well ) );
+  setBase( ptr_cast<Construction>( well ) );
 
   std::string text;
   if( well.isValid() )
@@ -177,9 +178,9 @@ AboutWell::AboutWell(Widget* parent, const Tile& tile)
 
 AboutWell::~AboutWell() {}
 
-void AboutWell::showDescription()
+void AboutWell::_showHelp()
 {
-  DictionaryWindow::show( parent(), building::well );
+  DictionaryWindow::show( parent(), objects::well );
 }
 
 }

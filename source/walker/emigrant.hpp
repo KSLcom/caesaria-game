@@ -18,47 +18,53 @@
 #ifndef __CAESARIA_EMIGRANT_H_INCLUDED__
 #define __CAESARIA_EMIGRANT_H_INCLUDED__
 
-#include "walker.hpp"
+#include "human.hpp"
 #include "core/predefinitions.hpp"
 #include "game/citizen_group.hpp"
 
 /** This is an emigrant coming with his stuff */
-class Emigrant : public Walker
+class Emigrant : public Human
 {
 public:
   static EmigrantPtr create( PlayerCityPtr city );
   static EmigrantPtr send2city( PlayerCityPtr city, const CitizenGroup& peoples,
-                                 const gfx::Tile& startTile, std::string thinks );
+                                 const gfx::Tile& startTile, std::string thoughts );
 
   bool send2city( const gfx::Tile& startTile );
   void leaveCity( const gfx::Tile& tile );
 
   void setPeoples( const CitizenGroup& peoples );
+  const CitizenGroup& peoples() const;
   virtual void timeStep(const unsigned long time);
+  virtual TilePos places(Place type) const;
 
   virtual ~Emigrant();
 
   virtual void save(VariantMap& stream) const;
   virtual void load(const VariantMap& stream);
   virtual bool die();
+  virtual void initialize(const VariantMap &options);
 
 protected:
   virtual void _reachedPathway();
   virtual void _brokePathway(TilePos pos);
   virtual void _noWay();
+  virtual bool _isCartBackward() const;
+  virtual gfx::Animation& _cart();
 
-  void _setCartPicture( const gfx::Picture& pic );
-  virtual const gfx::Picture& _cartPicture();
+  void _setCart( const gfx::Animation& anim );
   
   Emigrant( PlayerCityPtr city );
 
   HousePtr _findBlankHouse();
   Pathway _findSomeWay(TilePos startPoint );
 
-  const CitizenGroup& _getPeoples() const;
   bool _checkNearestHouse();
   void _append2house(HousePtr house);
   void _checkHouses(HouseList &hlist);
+  void _lockHouse(HousePtr house);
+  void _splitHouseFreeRoom(HouseList& moreRooms, HouseList& lessRooms);
+  void _findFinestHouses(HouseList& hlist);
 
 private:
   class Impl;

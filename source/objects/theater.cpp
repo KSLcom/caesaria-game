@@ -21,23 +21,26 @@
 #include "game/resourcegroup.hpp"
 #include "actor_colony.hpp"
 #include "walker/walker.hpp"
+#include "objects_factory.hpp"
 
 using namespace constants;
 using namespace gfx;
 
-Theater::Theater() : EntertainmentBuilding(Service::theater, building::theater, Size(2))
+REGISTER_CLASS_IN_OVERLAYFACTORY(objects::theater, Theater)
+
+Theater::Theater() : EntertainmentBuilding(Service::theater, objects::theater, Size(2))
 {
   _fgPicturesRef().resize(2);
 
   _addNecessaryWalker( walker::actor );
 }
 
-bool Theater::build(PlayerCityPtr city, const TilePos& pos)
+bool Theater::build( const CityAreaInfo& info )
 {
-  ServiceBuilding::build( city, pos );
+  ServiceBuilding::build( info );
 
-  city::Helper helper( city );
-  ActorColonyList actors = helper.find<ActorColony>( building::actorColony );
+  city::Helper helper( info.city );
+  ActorColonyList actors = helper.find<ActorColony>( objects::actorColony );
 
   if( actors.empty() )
   {

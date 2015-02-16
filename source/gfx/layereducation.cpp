@@ -31,9 +31,12 @@ using namespace constants;
 namespace gfx
 {
 
-int LayerEducation::type() const {  return _type; }
+namespace layer
+{
 
-int LayerEducation::_getLevelValue( HousePtr house ) const
+int Education::type() const {  return _type; }
+
+int Education::_getLevelValue( HousePtr house ) const
 {
   switch(_type)
   {
@@ -59,7 +62,7 @@ int LayerEducation::_getLevelValue( HousePtr house ) const
   return 0;
 }
 
-void LayerEducation::drawTile(Engine& engine, Tile& tile, const Point& offset)
+void Education::drawTile(Engine& engine, Tile& tile, const Point& offset)
 {
   Point screenPos = tile.mappos() + offset;
 
@@ -74,56 +77,33 @@ void LayerEducation::drawTile(Engine& engine, Tile& tile, const Point& offset)
     TileOverlayPtr overlay = tile.overlay();
 
     int educationLevel = -1;
-    switch( overlay->type() )
+    if( _isVisibleObject( overlay->type() ) )
     {
-    // Base set of visible objects
-    case construction::road:
-    case construction::plaza:
-    case construction::garden:
-
-    case building::burnedRuins:
-    case building::collapsedRuins:
-
-    case building::lowBridge:
-    case building::highBridge:
-
-    case building::elevation:
-    case building::rift:
+      // Base set of visible objects
       needDrawAnimations = true;
-    break;
+    }
+    else if( _flags.count( overlay->type() ) > 0 )
+    {
+      needDrawAnimations = true;
+      //city::Helper helper( _city() );
+      //drawArea( engine, helper.getArea( overlay ), offset, ResourceGroup::foodOverlay, OverlayPic::base );
+    }
+    else if( overlay->type() == objects::house )
+    {
+      HousePtr house = ptr_cast<House>( overlay );
 
-    case building::school:
-    case building::library:
-    case building::academy:
-      needDrawAnimations = _flags.count( overlay->type() ) > 0;
-      if( !needDrawAnimations )
-      {
-        city::Helper helper( _city() );
-        drawArea( engine, helper.getArea( overlay ), offset, ResourceGroup::foodOverlay, OverlayPic::base );
-      }
-    break;
+      educationLevel = _getLevelValue( house );
 
-      //houses
-    case building::house:
-      {
-        HousePtr house = ptr_cast<House>( overlay );
+      needDrawAnimations = (house->spec().level() == 1) && (house->habitants().empty());
 
-        educationLevel = _getLevelValue( house );
-
-        needDrawAnimations = (house->spec().level() == 1) && (house->habitants().empty());
-
-        city::Helper helper( _city() );
-        drawArea( engine, helper.getArea( overlay ), offset, ResourceGroup::foodOverlay, OverlayPic::inHouseBase );
-      }
-    break;
-
+      city::Helper helper( _city() );
+      drawArea( engine, helper.getArea( overlay ), offset, ResourceGroup::foodOverlay, OverlayPic::inHouseBase );
+    }
+    else
+    {
       //other buildings
-    default:
-      {
-        city::Helper helper( _city() );
-        drawArea( engine, helper.getArea( overlay ), offset, ResourceGroup::foodOverlay, OverlayPic::base );
-      }
-    break;
+      city::Helper helper( _city() );
+      drawArea( engine, helper.getArea( overlay ), offset, ResourceGroup::foodOverlay, OverlayPic::base );
     }
 
     if( needDrawAnimations )
@@ -133,22 +113,22 @@ void LayerEducation::drawTile(Engine& engine, Tile& tile, const Point& offset)
     }
     else if( educationLevel > 0 )
     {
-      drawColumn( engine, screenPos, educationLevel );
+      _addColumn( screenPos, educationLevel );
     }
   }
 
   tile.setWasDrawn();
 }
 
-LayerPtr LayerEducation::create( Camera& camera, PlayerCityPtr city, int type )
+LayerPtr Education::create( Camera& camera, PlayerCityPtr city, int type )
 {
-  LayerPtr ret( new LayerEducation( camera, city, type ) );
+  LayerPtr ret( new Education( camera, city, type ) );
   ret->drop();
 
   return ret;
 }
 
-std::string LayerEducation::_getAccessLevel( int lvlValue ) const
+std::string Education::_getAccessLevel( int lvlValue ) const
 {
   if( lvlValue == 0 ) { return "##no_"; }
   else if( lvlValue < 20 ) { return "##warning_"; }
@@ -158,7 +138,7 @@ std::string LayerEducation::_getAccessLevel( int lvlValue ) const
   else { return "##awesome_"; }
 }
 
-void LayerEducation::handleEvent(NEvent& event)
+void Education::handleEvent(NEvent& event)
 {
   if( event.EventType == sEventMouse )
   {
@@ -221,19 +201,26 @@ void LayerEducation::handleEvent(NEvent& event)
   Layer::handleEvent( event );
 }
 
-LayerEducation::LayerEducation( Camera& camera, PlayerCityPtr city, int type)
-  : Layer( &camera, city )
+Education::Education( Camera& camera, PlayerCityPtr city, int type)
+  : Info( camera, city, 9 )
 {
-  _loadColumnPicture( 9 );
   _type = type;
 
   switch( type )
   {
   case citylayer::education:
-  case citylayer::school: _flags.insert( building::school ); _addWalkerType( walker::scholar ); break;
-  case citylayer::library: _flags.insert( building::library ); _addWalkerType( walker::librarian ); break;
-  case citylayer::academy: _flags.insert( building::academy ); _addWalkerType( walker::teacher ); break;
+    _flags << objects::school << objects::library << objects::academy;
+    _visibleWalkers() << walker::scholar << walker::librarian << walker::teacher;
+  break;
+
+  case citylayer::school: _flags << objects::school; _visibleWalkers() << walker::scholar; break;
+  case citylayer::library: _flags << objects::library; _visibleWalkers() << walker::librarian; break;
+  case citylayer::academy: _flags << objects::academy; _visibleWalkers() << walker::teacher; break;
   }
+
+  _fillVisibleObjects( citylayer::education );
+}
+
 }
 
 }//end namespace gfx

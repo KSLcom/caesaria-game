@@ -25,16 +25,19 @@
 #include "tilemap_camera.hpp"
 #include "city/helper.hpp"
 #include "core/gettext.hpp"
-#include "core/stringhelper.hpp"
+#include "core/utils.hpp"
 
 using namespace constants;
 
 namespace gfx
 {
 
-int LayerEntertainment::type() const {  return _type; }
+namespace layer
+{
 
-int LayerEntertainment::_getLevelValue( HousePtr house )
+int Entertainment::type() const {  return _type; }
+
+int Entertainment::_getLevelValue( HousePtr house )
 {
   switch( _type )
   {
@@ -53,7 +56,7 @@ int LayerEntertainment::_getLevelValue( HousePtr house )
   return 0;
 }
 
-void LayerEntertainment::drawTile(Engine& engine, Tile& tile, const Point& offset)
+void Entertainment::drawTile(Engine& engine, Tile& tile, const Point& offset)
 {
   Point screenPos = tile.mappos() + offset;
 
@@ -68,58 +71,33 @@ void LayerEntertainment::drawTile(Engine& engine, Tile& tile, const Point& offse
     TileOverlayPtr overlay = tile.overlay();
 
     int entertainmentLevel = -1;
-    switch( overlay->type() )
+    if( _isVisibleObject( overlay->type() ) )
     {
-    // Base set of visible objects
-    case construction::road:
-    case construction::plaza:
-    case construction::garden:
-
-    case building::burnedRuins:
-    case building::collapsedRuins:
-
-    case building::lowBridge:
-    case building::highBridge:
-
-    case building::elevation:
-    case building::rift:
+      // Base set of visible objects
       needDrawAnimations = true;
-    break;
+    }
+    else if( _flags.count( overlay->type() ) > 0 )
+    {
+      needDrawAnimations = true;
+      //if( !needDrawAnimations )
+      //{
+      //  city::Helper helper( _city() );
+      //  drawArea( engine, helper.getArea( overlay ), offset, ResourceGroup::foodOverlay, OverlayPic::base );
+      //}
+    }
+    else if( overlay->type() == objects::house )
+    {
+      HousePtr house = ptr_cast<House>( overlay );
+      entertainmentLevel = _getLevelValue( house );
 
-    case building::theater:
-    case building::amphitheater:
-    case building::colloseum:
-    case building::hippodrome:
-    case building::lionsNursery:
-    case building::actorColony:
-    case building::gladiatorSchool:
-      needDrawAnimations = _flags.count( overlay->type() ) > 0;
-      if( !needDrawAnimations )
-      {
-        city::Helper helper( _city() );
-        drawArea( engine, helper.getArea( overlay ), offset, ResourceGroup::foodOverlay, OverlayPic::base );
-      }
-    break;
-
-      //houses
-    case building::house:
-      {
-        HousePtr house = ptr_cast<House>( overlay );
-        entertainmentLevel = _getLevelValue( house );
-
-        needDrawAnimations = (house->spec().level() == 1) && (house->habitants().empty());
-        city::Helper helper( _city() );
-        drawArea( engine, helper.getArea( overlay ), offset, ResourceGroup::foodOverlay, OverlayPic::inHouseBase );
-      }
-    break;
-
-      //other buildings
-    default:
-      {
-        city::Helper helper( _city() );
-        drawArea( engine, helper.getArea( overlay ), offset, ResourceGroup::foodOverlay, OverlayPic::base );
-      }
-    break;
+      needDrawAnimations = (house->spec().level() == 1) && (house->habitants().empty());
+      city::Helper helper( _city() );
+      drawArea( engine, helper.getArea( overlay ), offset, ResourceGroup::foodOverlay, OverlayPic::inHouseBase );
+    }
+    else
+    {
+      city::Helper helper( _city() );
+      drawArea( engine, helper.getArea( overlay ), offset, ResourceGroup::foodOverlay, OverlayPic::base );
     }
 
     if( needDrawAnimations )
@@ -129,22 +107,22 @@ void LayerEntertainment::drawTile(Engine& engine, Tile& tile, const Point& offse
     }
     else if( entertainmentLevel > 0 )
     {
-      drawColumn( engine, screenPos, entertainmentLevel );
+      _addColumn( screenPos, entertainmentLevel );
     }
   }
 
   tile.setWasDrawn();
 }
 
-LayerPtr LayerEntertainment::create(TilemapCamera& camera, PlayerCityPtr city, int type )
+LayerPtr Entertainment::create(TilemapCamera& camera, PlayerCityPtr city, int type )
 {
-  LayerPtr ret( new LayerEntertainment( camera, city, type ) );
+  LayerPtr ret( new Entertainment( camera, city, type ) );
   ret->drop();
 
   return ret;
 }
 
-void LayerEntertainment::handleEvent(NEvent& event)
+void Entertainment::handleEvent(NEvent& event)
 {
   if( event.EventType == sEventMouse )
   {
@@ -172,7 +150,7 @@ void LayerEntertainment::handleEvent(NEvent& event)
           int lvlValue = _getLevelValue( house );
           if( _type == citylayer::entertainment )
           {
-            text = StringHelper::format( 0xff, "##%d_entertainment_access##", lvlValue / 10 );
+            text = utils::format( 0xff, "##%d_entertainment_access##", lvlValue / 10 );
           }
           else
           {
@@ -207,62 +185,50 @@ void LayerEntertainment::handleEvent(NEvent& event)
   Layer::handleEvent( event );
 }
 
-LayerEntertainment::LayerEntertainment( Camera& camera, PlayerCityPtr city, int type )
-  : Layer( &camera, city )
+Entertainment::Entertainment( Camera& camera, PlayerCityPtr city, int type )
+  : Info( camera, city, 9 )
 {
-  _loadColumnPicture( 9 );
   _type = type;
 
   switch( type )
   {
   case citylayer::entertainment:
-    _flags.insert( building::unknown ); _flags.insert( building::theater );
-    _flags.insert( building::amphitheater ); _flags.insert( building::colloseum );
-    _flags.insert( building::hippodrome ); _flags.insert( building::actorColony );
-    _flags.insert( building::gladiatorSchool ); _flags.insert( building::lionsNursery );
-    _flags.insert( building::chariotSchool );
+    _flags << objects::unknown << objects::theater
+           << objects::amphitheater << objects::colloseum
+           << objects::hippodrome << objects::actorColony
+           << objects::gladiatorSchool << objects::lionsNursery
+           << objects::chariotSchool;
 
-    _addWalkerType( walker::actor );
-    _addWalkerType( walker::gladiator );
-    _addWalkerType( walker::lionTamer );
-    _addWalkerType( walker::charioteer );
+    _visibleWalkers() << walker::actor << walker::gladiator
+                      << walker::lionTamer << walker::charioteer;
   break;
 
   case citylayer::theater:
-    _flags.insert( building::theater );
-    _flags.insert( building::actorColony );
-
-    _addWalkerType( walker::actor );
+    _flags << objects::theater << objects::actorColony;
+    _visibleWalkers() << walker::actor;
   break;
 
   case citylayer::amphitheater:
-    _flags.insert( building::amphitheater );
-    _flags.insert( building::actorColony );
-    _flags.insert( building::gladiatorSchool );
-
-    _addWalkerType( walker::actor );
-    _addWalkerType( walker::gladiator );
+    _flags << objects::amphitheater << objects::actorColony << objects::gladiatorSchool;
+    _visibleWalkers() << walker::actor << walker::gladiator;
   break;
 
   case citylayer::colloseum:
-    _flags.insert( building::colloseum );
-    _flags.insert( building::gladiatorSchool );
-    _flags.insert( building::lionsNursery );
-
-    _addWalkerType( walker::gladiator );
-    _addWalkerType( walker::lionTamer );
+    _flags << objects::colloseum << objects::gladiatorSchool << objects::lionsNursery;
+    _visibleWalkers() << walker::gladiator << walker::lionTamer;
   break;
 
-
   case citylayer::hippodrome:
-    _flags.insert( building::hippodrome );
-    _flags.insert( building::chariotSchool );
-
+    _flags << objects::hippodrome << objects::chariotSchool;
     _addWalkerType( walker::charioteer );
   break;
 
   default: break;
   }
+
+  _fillVisibleObjects( citylayer::entertainment );
 }
+
+}//end namespace layer
 
 }//end namespace gfx

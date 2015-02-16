@@ -20,12 +20,13 @@
 #include "city/city.hpp"
 #include "good/goodhelper.hpp"
 #include "image.hpp"
-#include "core/stringhelper.hpp"
+#include "core/utils.hpp"
 #include "label.hpp"
 #include "core/event.hpp"
 
 using namespace constants;
 using namespace gfx;
+using namespace city;
 
 namespace gui
 {
@@ -33,38 +34,37 @@ namespace gui
 namespace advisorwnd
 {
 
-EmpirePricesWindow::EmpirePricesWindow(Widget *parent, int id, const Rect &rectangle, PlayerCityPtr city)
+EmpirePrices::EmpirePrices(Widget *parent, int id, const Rect &rectangle, PlayerCityPtr city)
   : Window( parent, rectangle, "", id )
 {
   setupUI( ":/gui/empireprices.gui" );
 
-  city::TradeOptions& ctrade = city->tradeOptions();
+  trade::Options& ctrade = city->tradeOptions();
   Font font = Font::create( FONT_1 );
   Point startPos( 140, 50 );
-  for( int i=Good::wheat; i < Good::prettyWine; i++ )
+  for( good::Product gtype=good::wheat; gtype < good::prettyWine; ++gtype )
+  {
+    if( gtype == good::fish || gtype == good::denaries)
     {
-      if( i == Good::fish || i == Good::denaries)
-        {
-          continue;
-        }
-
-      Good::Type gtype = (Good::Type)i;
-      Picture goodIcon = GoodHelper::picture( gtype );
-      new Image( this, startPos, goodIcon );
-
-      std::string priceStr = StringHelper::format( 0xff, "%d", ctrade.buyPrice( gtype ) );
-      Label* lb = new Label( this, Rect( startPos + Point( 0, 34 ), Size( 24, 24 ) ), priceStr );
-      lb->setFont( font );
-
-      priceStr = StringHelper::format( 0xff, "%d", ctrade.sellPrice( gtype ) );
-      lb = new Label( this, Rect( startPos + Point( 0, 58 ), Size( 24, 24 ) ), priceStr );
-      lb->setFont( font );
-
-      startPos += Point( 30, 0 );
+      continue;
     }
+
+    Picture goodIcon = good::Helper::picture( gtype );
+    new Image( this, startPos, goodIcon );
+
+    std::string priceStr = utils::i2str( ctrade.buyPrice( gtype ) );
+    Label* lb = new Label( this, Rect( startPos + Point( 0, 34 ), Size( 24, 24 ) ), priceStr );
+    lb->setFont( font );
+
+    priceStr = utils::i2str( ctrade.sellPrice( gtype ) );
+    lb = new Label( this, Rect( startPos + Point( 0, 58 ), Size( 24, 24 ) ), priceStr );
+    lb->setFont( font );
+
+    startPos += Point( 30, 0 );
+  }
 }
 
-void EmpirePricesWindow::draw(Engine &painter)
+void EmpirePrices::draw(Engine &painter)
 {
   if( !visible() )
     return;
@@ -72,7 +72,7 @@ void EmpirePricesWindow::draw(Engine &painter)
   Window::draw( painter );
 }
 
-bool EmpirePricesWindow::onEvent(const NEvent &event)
+bool EmpirePrices::onEvent(const NEvent &event)
 {
   if( event.EventType == sEventMouse && event.mouse.isRightPressed() )
     {

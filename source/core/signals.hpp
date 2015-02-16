@@ -18,10 +18,11 @@
 
 #include "delegate.hpp"
 #include "list.hpp"
+#include "foreach.hpp"
 
-#define oc3_signals
-#define oc3_slots
-#define oc3_emit
+#define signals
+#define slots
+#define emit
 
 #define CONNECT( a, signal, b, slot ) \
 { \
@@ -35,77 +36,57 @@ template< class Param0 = void >
 class Signal0
 {
 public:
-	typedef Delegate0< void > _Delegate;
+  typedef Delegate0< void > _Delegate;
 
 private:
-	typedef List<_Delegate> DelegateList;
-    typedef typename DelegateList::const_iterator DelegateIterator;
-	DelegateList delegateList;
+  typedef List<_Delegate> DelegateList;
+  DelegateList delegateList;
 
 public:
-	void connect( _Delegate delegate )
-	{
-		delegateList.push_back( delegate );
-	}
+  void connect( _Delegate delegate ) { delegateList.push_back( delegate ); }
 
-	template< class X, class Y >
-	void connect( Y * obj, void (X::*func)() )
-	{
-		delegateList.push_back( makeDelegate( obj, func ) );
-	}
+  template< class X, class Y >
+  void connect( Y * obj, void (X::*func)() )
+  {
+    delegateList.push_back( makeDelegate( obj, func ) );
+  }
 
-	template< class X, class Y >
-	void connect( Y * obj, void (X::*func)() const )
-	{
-		delegateList.push_back( makeDelegate( obj, func ) );
-	}
+  template< class X, class Y >
+  void connect( Y * obj, void (X::*func)() const )
+  {
+    delegateList.push_back( makeDelegate( obj, func ) );
+  }
 
-	void disconnect( _Delegate delegate )
-	{
-		for (DelegateList::iterator it = delegateList.begin(); it != delegateList.end(); ++it)
-		{
-			if( *it == delegate )
-			{
-				delegateList.erase( it );
-				return;
-			}
-		}
-	}
+  void disconnect( _Delegate delegate )
+  {
+    foreach( it, delegateList )
+      if( *it == delegate )
+      {
+        delegateList.erase( it );
+        return;
+      }
+  }
 
-	template< class X, class Y >
-	void disconnect( Y * obj, void (X::*func)() )
-	{
-		_Delegate& eq = makeDelegate( obj, func );
-                for (DelegateList::iterator it = delegateList.begin(); it != delegateList.end(); ++it)
-			if( *it == eq )
-			{
-				delegateList.erase( it );
-				return;
-			}
-	}
+  template< class X, class Y >
+  void disconnect( Y * obj, void (X::*func)() )
+  {
+    _Delegate& eq = makeDelegate( obj, func );
+    foreach(it, delegateList)
+      if( *it == eq )
+        { delegateList.erase( it ); return; }
+  }
 
-	template< class X, class Y >
-	void disconnect( Y * obj, void (X::*func)() const )
-	{
-		_Delegate& eq = makeDelegate( obj, func );
-                for (DelegateList::iterator it = delegateList.begin(); it != delegateList.end(); ++it)
-			if( *it == eq )
-			{
-				delegateList.erase( it );
-				return;
-			}
-	}
+  template< class X, class Y >
+  void disconnect( Y * obj, void (X::*func)() const )
+  {
+    _Delegate& eq = makeDelegate( obj, func );
+    foreach(it, delegateList)
+      if( *it == eq )
+        { delegateList.erase( it ); return; }
+  }
 
-	void emit() const
-	{
-		for (DelegateIterator it = delegateList.begin(); it != delegateList.end(); ++it)
-			(*it)();
-	}
-
-	void operator() () const
-	{
-		emit();
-	}
+  void _emit() const { foreach( it, delegateList ) (*it)(); }
+  void operator() () const { _emit(); }
 };
 
 
@@ -113,82 +94,56 @@ template< class Param1 >
 class Signal1
 {
 public:
-	typedef Delegate1< Param1 > _Delegate;
+  typedef Delegate1< Param1 > _Delegate;
 
 private:
-	typedef List<_Delegate> DelegateList;
-	typedef typename DelegateList::const_iterator DelegateIterator;
-	DelegateList delegateList;
+  typedef List<_Delegate> DelegateList;
+  DelegateList delegateList;
 
 public:
-	void connect( _Delegate delegate )
-	{
-		delegateList.push_back( delegate );
-	}
+  void connect( _Delegate delegate ) { delegateList.push_back( delegate ); }
 
-	template< class X, class Y >
-	void connect( Y * obj, void (X::*func)( Param1 p1 ) )
-	{
-		delegateList.push_back( makeDelegate( obj, func ) );
-	}
-
-	template< class X, class Y >
-	void connect( Y * obj, void (X::*func)( Param1 p1 ) const )
-	{
-		delegateList.push_back( makeDelegate( obj, func ) );
-	}
-
-  void disconnectAll()
+  template< class X, class Y >
+  void connect( Y * obj, void (X::*func)( Param1 p1 ) )
   {
-    delegateList.clear();
+    delegateList.push_back( makeDelegate( obj, func ) );
   }
 
-	void disconnect( _Delegate delegate )
-	{
-		for (DelegateIterator it = delegateList.begin(); it != delegateList.end(); ++it)
-			if( *it == delegate )
-			{
-				delegateList.erase( it );
-				return;
-			}	
+  template< class X, class Y >
+  void connect( Y * obj, void (X::*func)( Param1 p1 ) const )
+  {
+    delegateList.push_back( makeDelegate( obj, func ) );
   }
 
-	template< class X, class Y >
-	void disconnect( Y * obj, void (X::*func)( Param1 p1 ) )
-	{
-		_Delegate& eq = makeDelegate( obj, func );
-		for (DelegateIterator it = delegateList.begin(); it != delegateList.end(); ++it)
-			if( *it == eq )
-			{
-				delegateList.erase( it );
-				return;
-			}
-	}
+  void disconnectAll() { delegateList.clear(); }
 
-	template< class X, class Y >
-	void disconnect( Y * obj, void (X::*func)( Param1 p1 ) const )
-	{
-		_Delegate& eq = makeDelegate( obj, func );
-		for (DelegateIterator it = delegateList.begin(); it != delegateList.end(); ++it)
-			if( *it == eq )
-			{
-				delegateList.erase( it );
-				return;
-			}
-	}
+  void disconnect( _Delegate delegate )
+  {
+    foreach( it, delegateList )
+      if( *it == delegate )
+      { delegateList.erase( it ); return; }
+  }
 
-	void emit( Param1 p1 ) const
-	{
-		for( DelegateIterator it = delegateList.begin(); it != delegateList.end(); ++it )
-		{
-			(*it)( p1 );
-		}
-	}
+  template< class X, class Y >
+  void disconnect( Y * obj, void (X::*func)( Param1 p1 ) )
+  {
+    _Delegate& eq = makeDelegate( obj, func );
+    foreach( it, delegateList)
+      if( *it == eq )
+        { delegateList.erase( it ); return; }
+  }
 
-	void operator() ( Param1 p1 ) const
-	{
-		emit( p1 );
-	}
+  template< class X, class Y >
+  void disconnect( Y * obj, void (X::*func)( Param1 p1 ) const )
+  {
+    _Delegate& eq = makeDelegate( obj, func );
+    foreach( it, delegateList )
+      if( *it == eq )
+        { delegateList.erase( it ); return; }
+  }
+
+  void _emit( Param1 p1 ) const { foreach( it, delegateList ) (*it)( p1 ); }
+  void operator() ( Param1 p1 ) const { _emit( p1 ); }
 };
 
 
@@ -196,74 +151,54 @@ template< class Param1, class Param2 >
 class Signal2
 {
 public:
-	typedef Delegate2< Param1, Param2 > _Delegate;
+  typedef Delegate2< Param1, Param2 > _Delegate;
 
 private:
-	typedef List<_Delegate> DelegateList;
-	typedef typename DelegateList::const_iterator DelegateIterator;
-	DelegateList delegateList;
+  typedef List<_Delegate> DelegateList;
+  DelegateList delegates;
 
 public:
-	void connect( _Delegate delegate )
-	{
-		delegateList.push_back( delegate );
-	}
+  void connect( _Delegate delegate )  {    delegates.push_back( delegate );  }
 
-	template< class X, class Y >
-	void connect( Y * obj, void (X::*func)( Param1 p1, Param2 p2 ) )
-	{
-		delegateList.push_back( makeDelegate( obj, func ) );
-	}
+  template< class X, class Y >
+  void connect( Y * obj, void (X::*func)( Param1 p1, Param2 p2 ) )
+  {
+    delegates.push_back( makeDelegate( obj, func ) );
+  }
 
-	template< class X, class Y >
-	void connect( Y * obj, void (X::*func)( Param1 p1, Param2 p2 ) const )
-	{
-		delegateList.push_back( makeDelegate( obj, func ) );
-	}
+  template< class X, class Y >
+  void connect( Y * obj, void (X::*func)( Param1 p1, Param2 p2 ) const )
+  {
+    delegates.push_back( makeDelegate( obj, func ) );
+  }
 
-	void disconnect( _Delegate delegate )
-	{
-		for (DelegateIterator it = delegateList.begin(); it != delegateList.end(); ++it)
-			if( *it == delegate )
-			{
-				delegateList.erase( it );
-				return;
-			}	}
+  void disconnect( _Delegate delegate )
+  {
+    foreach(it, delegates )
+      if( *it == delegate )
+        { delegates.erase( it ); return; }
+  }
 
-	template< class X, class Y >
-	void disconnect( Y * obj, void (X::*func)( Param1 p1, Param2 p2 ) )
-	{
-		_Delegate& eq = makeDelegate( obj, func );
-		for (DelegateIterator it = delegateList.begin(); it != delegateList.end(); ++it)
-			if( *it == eq )
-			{
-				delegateList.erase( it );
-				return;
-			}
-	}
+  template< class X, class Y >
+  void disconnect( Y * obj, void (X::*func)( Param1 p1, Param2 p2 ) )
+  {
+    _Delegate& eq = makeDelegate( obj, func );
+    foreach( it, delegates )
+      if( *it == eq )
+        { delegates.erase( it ); return; }
+  }
 
-	template< class X, class Y >
-	void disconnect( Y * obj, void (X::*func)( Param1 p1, Param2 p2 ) const )
-	{
-		_Delegate& eq = makeDelegate( obj, func );
-		for (DelegateIterator it = delegateList.begin(); it != delegateList.end(); ++it)
-			if( *it == eq )
-			{
-				delegateList.erase( it );
-				return;
-			}
-	}
+  template< class X, class Y >
+  void disconnect( Y * obj, void (X::*func)( Param1 p1, Param2 p2 ) const )
+  {
+    _Delegate& eq = makeDelegate( obj, func );
+    foreach( it, delegates)
+      if( *it == eq )
+       { delegates.erase( it ); return; }
+  }
 
-	void emit( Param1 p1, Param2 p2 ) const
-	{
-		for (DelegateIterator it = delegateList.begin(); it != delegateList.end(); ++it)
-			(*it)( p1, p2 );
-	}
-
-	void operator() ( Param1 p1, Param2 p2 ) const
-	{
-		emit( p1, p2 );
-	}
+  void _emit( Param1 p1, Param2 p2 ) const { foreach(it, delegates ) (*it)( p1, p2 ); }
+  void operator() ( Param1 p1, Param2 p2 ) const { _emit( p1, p2 ); }
 };
 
 
@@ -330,7 +265,7 @@ public:
 			}
 	}
 
-	void emit( Param1 p1, Param2 p2, Param3 p3 ) const
+  void _emit( Param1 p1, Param2 p2, Param3 p3 ) const
 	{
 		for (DelegateIterator it = delegateList.begin(); it != delegateList.end(); ++it)
 			( *it )( p1, p2, p3 );
@@ -338,7 +273,7 @@ public:
 
 	void operator() ( Param1 p1, Param2 p2, Param3 p3 ) const
 	{
-		emit( p1, p2, p3 );
+    _emit( p1, p2, p3 );
 	}
 };
 
@@ -406,7 +341,7 @@ public:
 			}
 	}
 
-	void emit( Param1 p1, Param2 p2, Param3 p3, Param4 p4 ) const
+  void _emit( Param1 p1, Param2 p2, Param3 p3, Param4 p4 ) const
 	{
 		for (DelegateIterator it = delegateList.begin(); it != delegateList.end(); ++it)
                     ( *it )( p1, p2, p3, p4 );
@@ -414,7 +349,7 @@ public:
 
 	void operator() ( Param1 p1, Param2 p2, Param3 p3, Param4 p4 ) const
 	{
-		emit( p1, p2, p3, p4 );
+    _emit( p1, p2, p3, p4 );
 	}
 };
 
@@ -482,7 +417,7 @@ public:
 			}
 	}
 
-	void emit( Param1 p1, Param2 p2, Param3 p3, Param4 p4, Param5 p5 ) const
+  void _emit( Param1 p1, Param2 p2, Param3 p3, Param4 p4, Param5 p5 ) const
 	{
 		for (DelegateIterator it = delegateList.begin(); it != delegateList.end(); ++it)
 			( *it )( p1, p2, p3, p4, p5 );
@@ -490,7 +425,7 @@ public:
 
 	void operator() ( Param1 p1, Param2 p2, Param3 p3, Param4 p4, Param5 p5 ) const
 	{
-		emit( p1, p2, p3, p4, p5 );
+    _emit( p1, p2, p3, p4, p5 );
 	}
 };
 
@@ -558,7 +493,7 @@ public:
 			}
 	}
 
-	void emit( Param1 p1, Param2 p2, Param3 p3, Param4 p4, Param5 p5, Param6 p6 ) const
+  void _emit( Param1 p1, Param2 p2, Param3 p3, Param4 p4, Param5 p5, Param6 p6 ) const
 	{
 		for (DelegateIterator it = delegateList.begin(); it != delegateList.end(); ++it)
 			(*it)( p1, p2, p3, p4, p5, p6 );
@@ -566,7 +501,7 @@ public:
 
 	void operator() ( Param1 p1, Param2 p2, Param3 p3, Param4 p4, Param5 p5, Param6 p6 ) const
 	{
-		emit( p1, p2, p3, p4, p5, p6 );
+    _emit( p1, p2, p3, p4, p5, p6 );
 	}
 };
 
@@ -602,12 +537,14 @@ public:
 
 	void disconnect( _Delegate delegate )
 	{
-		for (DelegateIterator it = delegateList.begin(); it != delegateList.end(); ++it)
-                        if( *it == delegate )
+    foreach( it, delegateList )
+    {
+      if( *it == delegate )
 			{
-                                delegateList.erase( it );
+        delegateList.erase( it );
 				return;
 			}
+    }
 	}
 
 	template< class X, class Y >
@@ -634,7 +571,7 @@ public:
 			}
 	}
 
-	void emit( Param1 p1, Param2 p2, Param3 p3, Param4 p4, Param5 p5, Param6 p6, Param7 p7 ) const
+  void _emit( Param1 p1, Param2 p2, Param3 p3, Param4 p4, Param5 p5, Param6 p6, Param7 p7 ) const
 	{
 		for (DelegateIterator it = delegateList.begin(); it != delegateList.end(); ++it)
                         (*it)( p1, p2, p3, p4, p5, p6, p7 );
@@ -642,7 +579,7 @@ public:
 
 	void operator() ( Param1 p1, Param2 p2, Param3 p3, Param4 p4, Param5 p5, Param6 p6, Param7 p7 ) const
 	{
-		emit( p1, p2, p3, p4, p5, p6, p7 );
+    _emit( p1, p2, p3, p4, p5, p6, p7 );
 	}
 };
 
@@ -710,7 +647,7 @@ public:
 			}
 	}
 
-	void emit( Param1 p1, Param2 p2, Param3 p3, Param4 p4, Param5 p5, Param6 p6, Param7 p7, Param8 p8 ) const
+  void _emit( Param1 p1, Param2 p2, Param3 p3, Param4 p4, Param5 p5, Param6 p6, Param7 p7, Param8 p8 ) const
 	{
 		for (DelegateIterator it = delegateList.begin(); it != delegateList.end(); ++it)
                         (*it)( p1, p2, p3, p4, p5, p6, p7, p8 );
@@ -718,7 +655,7 @@ public:
 
 	void operator() ( Param1 p1, Param2 p2, Param3 p3, Param4 p4, Param5 p5, Param6 p6, Param7 p7, Param8 p8 ) const
 	{
-		emit( p1, p2, p3, p4, p5, p6, p7, p8 );
+    _emit( p1, p2, p3, p4, p5, p6, p7, p8 );
 	}
 };
 

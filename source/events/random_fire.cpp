@@ -22,7 +22,9 @@
 #include "objects/house.hpp"
 #include "events/dispatcher.hpp"
 #include "core/priorities.hpp"
+#include "core/variant_map.hpp"
 #include "core/logger.hpp"
+#include "factory.hpp"
 
 using namespace constants;
 
@@ -33,6 +35,8 @@ namespace {
 CAESARIA_LITERALCONST(population)
 CAESARIA_LITERALCONST(strong)
 }
+
+REGISTER_EVENT_IN_FACTORY(RandomFire, "random_fire")
 
 class RandomFire::Impl
 {
@@ -59,9 +63,9 @@ void RandomFire::_exec( Game& game, unsigned int time)
     _d->isDeleted = true;
 
     Priorities<int> exclude;
-    exclude << building::waterGroup
-            << building::roadGroup
-            << building::disasterGroup;
+    exclude << objects::waterGroup
+            << objects::roadGroup
+            << objects::disasterGroup;
 
     ConstructionList ctrs;
     ctrs << game.city()->overlays();
@@ -107,6 +111,9 @@ VariantMap RandomFire::save() const
 RandomFire::RandomFire() : _d( new Impl )
 {
   _d->isDeleted = false;
+  _d->minPopulation = 0;
+  _d->maxPopulation = 999999;
+  _d->strong = 10;
 }
 
 }//end namespace events

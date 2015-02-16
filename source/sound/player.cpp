@@ -21,6 +21,7 @@
 #include "core/stringarray.hpp"
 #include "core/foreach.hpp"
 #include "core/saveadapter.hpp"
+#include "core/variant_map.hpp"
 #include "game/gamedate.hpp"
 #include "sound/engine.hpp"
 
@@ -36,32 +37,32 @@ public:
   int lastIndex;
 };
 
-Player::Player( PlayerCityPtr city ) : Srvc( *city.object(), defaultName()  ), _d( new Impl )
+Player::Player( PlayerCityPtr city )
+  : Srvc( city, defaultName()  ), _d( new Impl )
 { 
   vfs::Path path = SETTINGS_RC_PATH( soundThemesModel );
 
   if( path.exist() )
   {
-    _d->playlist = SaveAdapter::load( path ).get( "items" ).toStringArray();
+    _d->playlist = config::load( path ).get( "items" ).toStringArray();
   }
 
   _d->lastIndex = 0;
 }
 
-city::SrvcPtr Player::create(PlayerCityPtr city)
+city::SrvcPtr Player::create( PlayerCityPtr city )
 {
-  Player* pl = new Player( city );
-  city::SrvcPtr ret( pl );
-  pl->drop();
+  city::SrvcPtr ret( new Player( city ) );
+  ret->drop();
 
   return ret;
 }
 
 std::string Player::defaultName() { return "audio_player"; }
 
-void Player::update( const unsigned int time )
+void Player::timeStep(const unsigned int time )
 {
-  if( GameDate::isWeekChanged() )
+  if( game::Date::isWeekChanged() )
   {
     if( _d->playlist.empty() )
       return;

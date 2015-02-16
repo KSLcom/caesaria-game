@@ -21,10 +21,13 @@
 #include "pathway/pathway.hpp"
 #include "objects/constants.hpp"
 #include "objects/house.hpp"
-#include "gfx/tile.hpp"
+#include "gfx/helper.hpp"
 #include "game/gamedate.hpp"
+#include "objects_factory.hpp"
 
 using namespace constants;
+
+REGISTER_CLASS_IN_OVERLAYFACTORY(objects::school, School)
 
 class School::Impl
 {
@@ -35,7 +38,7 @@ public:
   unsigned int maxMonthVisitors;
 };
 
-School::School() : ServiceBuilding(Service::school, building::school, Size(2)), _d( new Impl )
+School::School() : ServiceBuilding(Service::school, objects::school, Size(2)), _d( new Impl )
 {
   setPicture( ResourceGroup::commerce, 83 );
   _d->maxMonthVisitors = 75;
@@ -49,7 +52,7 @@ void School::deliverService()
   if( numberWorkers() <= 0 )
     return;
 
-  if( lastSendService().month() != GameDate::current().month() )
+  if( lastSendService().month() != game::Date::current().month() )
   {
     _d->currentPeopleServed = 0;
     _d->srvBuidings.clear();
@@ -73,7 +76,7 @@ void School::buildingsServed(const std::set<BuildingPtr>& buildings, ServiceWalk
     HousePtr house = ptr_cast<House>( *it );
     if( house.isValid() )
     {
-      unsigned int posHash = gfx::TileHelper::hash( house->pos() );
+      unsigned int posHash = gfx::tile::hash(house->pos());
       _d->srvBuidings[ posHash ] = house->habitants().count( CitizenGroup::scholar );
     }
   }
@@ -93,14 +96,14 @@ int School::_getWalkerOrders() const
   return ServiceWalker::goLowerService|ServiceWalker::anywayWhenFailed|ServiceWalker::enterLastHouse;
 }
 
-Library::Library() : ServiceBuilding(Service::library, building::library, Size(2))
+Library::Library() : ServiceBuilding(Service::library, objects::library, Size(2))
 {
   setPicture( ResourceGroup::commerce, 84 );
 }
 
 int Library::getVisitorsNumber() const {  return 800; }
 
-Academy::Academy() : ServiceBuilding(Service::academy, building::academy, Size(3))
+Academy::Academy() : ServiceBuilding(Service::academy, objects::academy, Size(3))
 {
   setPicture( ResourceGroup::commerce, 85 );
 }

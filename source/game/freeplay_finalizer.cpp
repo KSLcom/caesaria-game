@@ -18,6 +18,7 @@
 #include "freeplay_finalizer.hpp"
 #include "core/saveadapter.hpp"
 #include "game/settings.hpp"
+#include "core/variant_map.hpp"
 #include "city/city.hpp"
 #include "world/empire.hpp"
 #include "world/emperor.hpp"
@@ -25,6 +26,12 @@
 #include "events/postpone.hpp"
 
 using namespace events;
+
+namespace game
+{
+
+namespace freeplay
+{
 
 void __loadEventsFromSection( const VariantMap& vm )
 {
@@ -35,28 +42,32 @@ void __loadEventsFromSection( const VariantMap& vm )
   }
 }
 
-void FreeplayFinalizer::addPopulationMilestones(PlayerCityPtr city)
+void addPopulationMilestones(PlayerCityPtr city)
 {
-  VariantMap freeplayVm = SaveAdapter::load( SETTINGS_RC_PATH( freeplay_opts ) );
+  VariantMap freeplayVm = config::load( SETTINGS_RC_PATH( freeplay_opts ) );
   __loadEventsFromSection( freeplayVm[ "population_milestones" ].toMap() );
 }
 
-void FreeplayFinalizer::addEvents(PlayerCityPtr city)
+void addEvents(PlayerCityPtr city)
 {
-  VariantMap freeplayVm = SaveAdapter::load( SETTINGS_RC_PATH( freeplay_opts ) );
+  VariantMap freeplayVm = config::load( SETTINGS_RC_PATH( freeplay_opts ) );
   __loadEventsFromSection( freeplayVm[ "events" ].toMap() );
 }
 
-void FreeplayFinalizer::resetFavour(PlayerCityPtr city)
+void resetFavour(PlayerCityPtr city)
 {
   world::Emperor& emperor = city->empire()->emperor();
   emperor.updateRelation( city->name(), 50 );
 }
 
-void FreeplayFinalizer::initBuildOptions(PlayerCityPtr city)
+void initBuildOptions(PlayerCityPtr city)
 {
-  city::BuildOptions bopts;
+  city::development::Options bopts;
   bopts = city->buildOptions();
-  bopts.setGroupAvailable( BM_MAX, true );
+  bopts.setGroupAvailable( city::development::all, true );
   city->setBuildOptions( bopts );
 }
+
+}//end namespace freeplay
+
+}//end namespace game

@@ -23,7 +23,9 @@
 #include "walker/enemysoldier.hpp"
 #include "events/postpone.hpp"
 #include "core/saveadapter.hpp"
+#include "objects/fort.hpp"
 #include "game/settings.hpp"
+#include "objects/extension.hpp"
 
 using namespace constants;
 using namespace gfx;
@@ -52,20 +54,39 @@ void Mars::_doWrath(PlayerCityPtr city)
 {
   events::GameEventPtr message = events::ShowInfobox::create( _("##wrath_of_mars_title##"),
                                                             _("##wrath_of_mars_text##"),
-                                                            events::ShowInfobox::send2scribe );  
+                                                            events::ShowInfobox::send2scribe,
+                                                            ":/smk/God_Mars.smk" );
   message->dispatch();
 
 
-  VariantMap vm = SaveAdapter::load( GameSettings::rcpath( "mars_wrath.model" ) );
+  VariantMap vm = config::load( game::Settings::rcpath( "mars_wrath.model" ) );
   events::GameEventPtr barb_attack = events::PostponeEvent::create( "", vm );
   barb_attack->dispatch();
 }
 
 void Mars::_doSmallCurse(PlayerCityPtr city)
-{
-  events::GameEventPtr message = events::ShowInfobox::create( _("##smallcurse_of_mars_title##"),
-                                                            _("##smallcurse_of_mars_text##"),
-                                                            events::ShowInfobox::send2scribe );
+{  
+  city::Helper helper( city );
+  FortList forts = helper.find<Fort>( objects::militaryGroup );
+
+  std::string text, title;
+  if( !forts.empty() )
+  {
+    title = "##smallcurse_of_mars_title##";
+    text = "##smallcurse_of_mars_text##";
+    FortPtr fort = forts.random();
+    FortCurseByMars::assignTo( fort, 12 );
+  }
+  else
+  {
+    title = "##smallcurse_of_mars_title##";
+    text = "##smallcurse_of_mars_failed_text##";
+  }
+
+  events::GameEventPtr message = events::ShowInfobox::create( _(title),
+                                                              _(text),
+                                                              events::ShowInfobox::send2scribe );
+
   message->dispatch();
 }
 

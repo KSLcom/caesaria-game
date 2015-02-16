@@ -21,8 +21,9 @@
 #include "core/foreach.hpp"
 #include "core/logger.hpp"
 #include "events/playsound.hpp"
-#include "core/stringhelper.hpp"
+#include "core/utils.hpp"
 #include "core/gettext.hpp"
+#include "core/variant_map.hpp"
 #include "texturedbutton.hpp"
 #include "widget_helper.hpp"
 #include "label.hpp"
@@ -54,7 +55,7 @@ TutorialWindow::TutorialWindow( Widget* p, vfs::Path tutorial )
   if( !lbxHelp )
     return;
 
-  VariantMap vm = SaveAdapter::load( tutorial );
+  VariantMap vm = config::load( tutorial );
   Logger::warningIf( vm.empty(), "Cannot load tutorial description from " + tutorial.toString() );
 
   StringArray items = vm.get( "items" ).toStringArray();
@@ -87,6 +88,8 @@ TutorialWindow::TutorialWindow( Widget* p, vfs::Path tutorial )
       lbxHelp->fitText( _( text ) );
     }
   }
+
+  setModal();
 }
 
 TutorialWindow::~TutorialWindow() {}

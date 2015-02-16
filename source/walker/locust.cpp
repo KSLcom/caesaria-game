@@ -16,7 +16,7 @@
 // Copyright 2012-2013 Dalerank, dalerankn8@gmail.com
 
 #include "locust.hpp"
-#include "core/variant.hpp"
+#include "core/variant_map.hpp"
 #include "city/helper.hpp"
 #include "core/gettext.hpp"
 #include "core/foreach.hpp"
@@ -78,11 +78,11 @@ void Locust::timeStep(const unsigned long time)
 {
   _d->counter++;
 
-  if( GameDate::isWeekChanged() )
+  if( game::Date::isWeekChanged() )
   {
-    city::Helper helper( _city() );
-    FarmPtr farm = helper.find<Farm>( building::any, pos() );
-    if( farm.isValid() && farm->type() != building::pigFarm )
+    FarmPtr farm;
+    farm << _city()->getOverlay( pos() );
+    if( farm.isValid() && farm->type() != objects::meat_farm )
     {
       farm->updateProgress( -50 );
     }

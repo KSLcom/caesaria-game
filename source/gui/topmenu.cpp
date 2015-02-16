@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU General Public License
 // along with CaesarIA.  If not, see <http://www.gnu.org/licenses/>.
 //
-// Copyright 2012-2014 Dalerank, dalerankn8@gmail.com
+// Copyright 2012-2015 Dalerank, dalerankn8@gmail.com
 
 #include "topmenu.hpp"
 
@@ -22,12 +22,11 @@
 #include "game/resourcegroup.hpp"
 #include "contextmenuitem.hpp"
 #include "gfx/picturesarray.hpp"
-#include "core/stringhelper.hpp"
+#include "core/utils.hpp"
 #include "game/datetimehelper.hpp"
 #include "gfx/engine.hpp"
 #include "game/enums.hpp"
 #include "game/gamedate.hpp"
-#include "game/settings.hpp"
 #include "environment.hpp"
 #include "widget_helper.hpp"
 #include "core/logger.hpp"
@@ -59,15 +58,16 @@ public:
   ContextMenu* langSelect;
   Pictures background;
 
-oc3_slots public:
+slots public:
   void resolveSave();
   void updateDate();
   void showAboutInfo();
   void resolveAdvisorShow(int);
+  void handleDebugEvent(int);
   void showShortKeyInfo();
   void initBackground( const Size& size );
 
-oc3_signals public:
+signals public:
   Signal0<> onExitSignal;
   Signal0<> onEndSignal;
   Signal0<> onSaveSignal;
@@ -95,28 +95,28 @@ void TopMenu::draw(gfx::Engine& engine )
 void TopMenu::setPopulation( int value )
 {
   if( _d->lbPopulation )
-    _d->lbPopulation->setText( StringHelper::format( 0xff, "%s %d", _("##pop##"), value ) );
+    _d->lbPopulation->setText( utils::format( 0xff, "%s %d", _("##pop##"), value ) );
 }
 
 void TopMenu::setFunds( int value )
 {
   if( _d->lbFunds )
-    _d->lbFunds->setText( StringHelper::format( 0xff, "%.2s %d", _("##denarii_short##"), value) );
+    _d->lbFunds->setText( utils::format( 0xff, "%.2s %d", _("##denarii_short##"), value) );
 }
 
 void TopMenu::Impl::updateDate()
 {
-  if( !lbDate || saveDate.month() == GameDate::current().month() )
+  if( !lbDate || saveDate.month() == game::Date::current().month() )
     return;
 
-  lbDate->setText( DateTimeHelper::toStr( GameDate::current() ) );
+  lbDate->setText( util::date2str( game::Date::current() ) );
 }
 
 void TopMenu::Impl::showShortKeyInfo()
 {
   Widget* parent = lbDate->ui()->rootWidget();
   Widget* bg = new Label( parent, Rect( 0, 0, 500, 300 ), "", false, Label::bgWhiteFrame );
-  bg->setupUI( GameSettings::rcpath( "/gui/shortkeys.gui" ) );
+  bg->setupUI( ":/gui/shortkeys.gui" );
   bg->setCenter( parent->center() );
 
   TexturedButton* btnExit = new TexturedButton( bg, Point( bg->width() - 34, bg->height() - 34 ), Size( 24 ), -1, ResourceMenu::exitInfBtnPicId );
@@ -140,8 +140,8 @@ void TopMenu::Impl::initBackground( const Size& size )
 
   while( x < size.width())
   {
-    background.append( p_marble[i%10], Point( x, 0 ) );
-    x += p_marble[i%10].width();
+    background.append( p_marble[i%12], Point( x, 0 ) );
+    x += p_marble[i%12].width();
     i++;
   }
 }
@@ -150,7 +150,7 @@ void TopMenu::Impl::showAboutInfo()
 {
   Widget* parent = lbDate->ui()->rootWidget();
   Widget* bg = new Label( parent, Rect( 0, 0, 500, 300 ), "", false, Label::bgWhiteFrame );
-  bg->setupUI( GameSettings::rcpath( "/gui/about.gui" ) );
+  bg->setupUI( ":/gui/about.gui" );
   bg->setCenter( parent->center() );
 
   TexturedButton* btnExit = new TexturedButton( bg, Point( bg->width() - 34, bg->height() - 34 ), Size( 24 ), -1, ResourceMenu::exitInfBtnPicId );
@@ -163,7 +163,7 @@ TopMenu::TopMenu( Widget* parent, const int height )
 : MainMenu( parent, Rect( 0, 0, parent->width(), height ) ),
   _d( new Impl )
 {
-  setupUI( GameSettings::rcpath( "/gui/topmenu.gui" ) );
+  setupUI( ":/gui/topmenu.gui" );
   setGeometry( Rect( 0, 0, parent->width(), height ) );
 
   _d->initBackground( size() );
@@ -190,11 +190,11 @@ TopMenu::TopMenu( Widget* parent, const int height )
   ContextMenuItem* mainMenu = file->addItem( _("##gmenu_file_mainmenu##"), -1, true, false, false, false );
   ContextMenuItem* exit = file->addItem( _("##gmenu_exit_game##"), -1, true, false, false, false );
 
-  CONNECT( restart, onClicked(), &_d->onRestartSignal, Signal0<>::emit );
-  CONNECT( exit, onClicked(), &_d->onExitSignal, Signal0<>::emit );
-  CONNECT( save, onClicked(), &_d->onSaveSignal, Signal0<>::emit );
-  CONNECT( load, onClicked(), &_d->onLoadSignal, Signal0<>::emit );
-  CONNECT( mainMenu, onClicked(), &_d->onEndSignal, Signal0<>::emit );
+  CONNECT( restart, onClicked(), &_d->onRestartSignal, Signal0<>::_emit );
+  CONNECT( exit, onClicked(), &_d->onExitSignal, Signal0<>::_emit );
+  CONNECT( save, onClicked(), &_d->onSaveSignal, Signal0<>::_emit );
+  CONNECT( load, onClicked(), &_d->onLoadSignal, Signal0<>::_emit );
+  CONNECT( mainMenu, onClicked(), &_d->onEndSignal, Signal0<>::_emit );
 
   tmp = addItem( _("##gmenu_options##"), -1, true, true, false, false );
   ContextMenu* options = tmp->addSubMenu();
@@ -203,10 +203,10 @@ TopMenu::TopMenu( Widget* parent, const int height )
   ContextMenuItem* speed = options->addItem( _("##speed_settings##"), -1, true, false, false, false );
   ContextMenuItem* cityopts = options->addItem( _("##city_settings##"), -1, true, false, false, false );
 
-  CONNECT( screen, onClicked(), &_d->onShowVideoOptionsSignal,     Signal0<>::emit );
-  CONNECT( speed,  onClicked(), &_d->onShowGameSpeedOptionsSignal, Signal0<>::emit );
-  CONNECT( sound,  onClicked(), &_d->onShowSoundOptionsSignal,     Signal0<>::emit );
-  CONNECT( cityopts,  onClicked(), &_d->onShowCityOptionsSignal,   Signal0<>::emit );
+  CONNECT( screen, onClicked(), &_d->onShowVideoOptionsSignal,     Signal0<>::_emit );
+  CONNECT( speed,  onClicked(), &_d->onShowGameSpeedOptionsSignal, Signal0<>::_emit );
+  CONNECT( sound,  onClicked(), &_d->onShowSoundOptionsSignal,     Signal0<>::_emit );
+  CONNECT( cityopts,  onClicked(), &_d->onShowCityOptionsSignal,   Signal0<>::_emit );
 
   tmp = addItem( _("##gmenu_help##"), -1, true, true, false, false );
   ContextMenu* helpMenu = tmp->addSubMenu();
@@ -245,6 +245,6 @@ Signal0<>& TopMenu::onShowVideoOptions(){  return _d->onShowVideoOptionsSignal; 
 Signal0<>&TopMenu::onShowSoundOptions(){ return _d->onShowSoundOptionsSignal; }
 Signal0<>& TopMenu::onShowGameSpeedOptions(){  return _d->onShowGameSpeedOptionsSignal; }
 Signal0<>&TopMenu::onShowCityOptions(){ return _d->onShowCityOptionsSignal; }
-void TopMenu::Impl::resolveAdvisorShow(int id) { onRequestAdvisorSignal.emit( (advisor::Type)id ); }
+void TopMenu::Impl::resolveAdvisorShow(int id) { emit onRequestAdvisorSignal( (advisor::Type)id ); }
 
 }//end namespace gui
